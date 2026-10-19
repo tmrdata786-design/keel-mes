@@ -1,0 +1,2334 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keel Furniture - MES & CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; }
+        .bg-dark-surface { background-color: #1e293b; }
+        .bg-dark-card { background-color: #334155; }
+        .border-dark { border-color: #475569; }
+        .text-dark-muted { color: #94a3b8; }
+        .btn-primary { background-color: #2563eb; color: #fff; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-secondary { background-color: #475569; color: #fff; }
+        .btn-secondary:hover { background-color: #334155; }
+        .btn-danger { background-color: #dc2626; color: #fff; }
+        .btn-danger:hover { background-color: #b91c1c; }
+        .btn-success { background-color: #16a34a; color: #fff; }
+        .btn-success:hover { background-color: #15803d; }
+        button:disabled { opacity: .55; cursor: not-allowed; }
+        .kanban-col { background-color: #1e293b; }
+        .kcard { background-color: #334155; }
+        .toast { animation: fadein .2s ease-out; }
+        @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .role-badge { background-color: #0f172a; }
+        select, input, textarea { color-scheme: dark; }
+    </style>
+</head>
+<body class="h-full">
+    <!-- Splash -->
+    <div id="splashScreen" class="h-full flex flex-col items-center justify-center p-6">
+        <div class="max-w-md w-full bg-dark-surface rounded-lg shadow-lg p-8 border border-dark">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold mb-2">Keel Furniture</h1>
+                <p class="text-dark-muted">Manufacturing Execution System & CRM</p>
+            </div>
+            <div class="mb-6">
+                <p class="text-sm text-dark-muted mb-4">This application loads its data live from Manager.io. Click below to initialize.</p>
+                <ul class="text-xs text-dark-muted space-y-2 mb-4">
+                    <li>- Customers (Leads & Clients)</li>
+                    <li>- Inventory Items (Raw Materials)</li>
+                    <li>- Sales Quotes (Pipeline)</li>
+                    <li>- Sales Orders (Work Orders)</li>
+                </ul>
+            </div>
+            <button id="loadDataBtn" class="w-full btn-primary py-3 px-4 rounded-md font-semibold transition-colors">Load Data</button>
+            <div id="loadStatus" class="mt-4 text-sm text-dark-muted hidden"></div>
+            <div id="loadProgress" class="mt-4 hidden">
+                <div class="w-full bg-dark-card rounded-full h-2">
+                    <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="progressText" class="text-xs text-dark-muted mt-2"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- App -->
+    <div id="appContainer" class="h-full hidden flex-col">
+        <header class="bg-dark-surface border-b border-dark px-6 py-3">
+            <div class="flex justify-between items-center gap-4 flex-wrap">
+                <div>
+                    <h1 class="text-lg font-bold">Keel Furniture - MES & CRM</h1>
+                    <p class="text-xs text-dark-muted">Pure Manager.io Integration</p>
+                </div>
+                <nav id="mainNav" class="flex flex-wrap gap-2">
+                    <button data-route="dashboard" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Dashboard</button>
+                    <button data-route="crm" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">CRM</button>
+                    <button data-route="pipeline" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Pipeline</button>
+                    <button data-route="design" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Design Team</button>
+                    <button data-route="production" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Production Floor</button>
+                    <button data-route="qc" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">QC Quarantine</button>
+                    <button data-route="materials" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Materials</button>
+                    <button data-route="procurement" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Procurement</button>
+                    <button data-route="subcontractors" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Subcontractors</button>
+                    <button data-route="capacity" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Capacity</button>
+                    <button data-route="audit" class="nav-btn btn-secondary py-2 px-3 rounded-md text-sm font-medium">Audit Trail</button>
+                </nav>
+                <div class="flex items-center gap-2">
+                    <span id="busyIndicator" class="hidden text-xs font-semibold text-amber-400 bg-amber-600/20 border border-amber-600 rounded px-2 py-1">Processing...</span>
+                    <label class="text-xs text-dark-muted">Role</label>
+                    <select id="role-selector" class="role-badge border border-dark rounded-md text-sm py-1.5 px-2">
+                        <option value="admin">Admin (CEO)</option>
+                        <option value="sales_manager">Sales Manager</option>
+                        <option value="sales_rep">Sales Rep</option>
+                        <option value="cost_engineer">Cost Engineer</option>
+                        <option value="production_manager">Production Manager</option>
+                        <option value="procurement">Procurement Officer</option>
+                        <option value="finance">Finance / Accounts</option>
+                    </select>
+                    <button id="refreshBtn" class="btn-secondary text-xs py-1.5 px-3 rounded-md">Refresh</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-auto p-6">
+            <!-- Dashboard -->
+            <div id="view-dashboard" class="view hidden">
+                <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
+                <div id="dashboardKPIs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6"></div>
+                <div class="bg-dark-surface rounded-lg border border-dark p-6">
+                    <h3 class="text-lg font-semibold mb-2">System Status</h3>
+                    <p id="dashStatus" class="text-dark-muted text-sm">Data loaded from Manager.io.</p>
+                </div>
+            </div>
+
+            <!-- CRM -->
+            <div id="view-crm" class="view hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold">Commercial CRM</h2>
+                    <div class="flex gap-2">
+                        <button data-tab="leads" class="crm-tab btn-primary py-2 px-4 rounded-md text-sm">Leads</button>
+                        <button data-tab="active" class="crm-tab btn-secondary py-2 px-4 rounded-md text-sm">Active Customers</button>
+                    </div>
+                </div>
+                <div id="crmContent" class="bg-dark-surface rounded-lg border border-dark p-4 overflow-auto"></div>
+            </div>
+
+            <!-- Pipeline -->
+            <div id="view-pipeline" class="view hidden">
+                <h2 class="text-2xl font-bold mb-4">Sales Pipeline</h2>
+                <div id="pipelineBoard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+            </div>
+
+            <!-- Design -->
+            <div id="view-design" class="view hidden">
+                <h2 class="text-2xl font-bold mb-4">Design Team</h2>
+                <div id="designContent" class="bg-dark-surface rounded-lg border border-dark p-4 overflow-auto"></div>
+            </div>
+
+            <!-- Production Floor -->
+            <div id="view-production" class="view hidden">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h2 class="text-2xl font-bold">Production Floor</h2>
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-dark-muted">Carpenter</label>
+                        <select id="prodCarpenterFilter" class="role-badge border border-dark rounded-md text-sm py-1.5 px-2">
+                            <option value="">All carpenters</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="productionBoard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- QC Quarantine -->
+            <div id="view-qc" class="view hidden">
+                <h2 class="text-2xl font-bold mb-4">QC Quarantine</h2>
+                <div id="qcContent" class="bg-dark-surface rounded-lg border border-dark p-4 overflow-auto"></div>
+            </div>
+
+            <!-- Materials -->
+            <div id="view-materials" class="view hidden">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h2 class="text-2xl font-bold">Materials - Dimensional Wood Plank Register</h2>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <select id="plankItemSelect" class="role-badge border border-dark rounded-md text-sm py-1.5 px-2 max-w-md"></select>
+                        <button class="btn-success py-2 px-3 rounded-md text-sm" data-action="receive-planks">Receive Planks</button>
+                        <button class="btn-primary py-2 px-3 rounded-md text-sm" data-action="issue-planks">Issue / Reserve Plank</button>
+                    </div>
+                </div>
+                <div id="plankRegister" class="bg-dark-surface rounded-lg border border-dark p-4 overflow-auto"></div>
+            </div>
+
+            <!-- Procurement -->
+            <div id="view-procurement" class="view hidden">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h2 class="text-2xl font-bold">Procurement</h2>
+                    <button class="btn-success py-2 px-3 rounded-md text-sm" data-action="generate-pr">Generate Purchase Requisition</button>
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div class="bg-dark-surface rounded-lg border border-dark p-4">
+                        <h3 class="text-lg font-semibold mb-3">Draft Requisitions (PR)</h3>
+                        <div id="prList" class="overflow-auto"></div>
+                    </div>
+                    <div class="bg-dark-surface rounded-lg border border-dark p-4">
+                        <h3 class="text-lg font-semibold mb-3">Approved Purchase Orders (PO)</h3>
+                        <div id="poList" class="overflow-auto"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Capacity -->
+            <div id="view-capacity" class="view hidden">
+                <h2 class="text-2xl font-bold mb-4">Carpenter Capacity</h2>
+                <div id="capacityContent" class="bg-dark-surface rounded-lg border border-dark p-4 overflow-auto"></div>
+            </div>
+
+            <!-- Subcontractors & Gate Passes -->
+            <div id="view-subcontractors" class="view hidden">
+                <h2 class="text-2xl font-bold mb-4">Subcontractors &amp; Gate Passes</h2>
+                <div id="subRisk" class="mb-4"></div>
+                <div class="bg-dark-surface rounded-lg border border-dark p-4 mb-4">
+                    <h3 class="text-lg font-semibold mb-3">Items at Outsourced Stages (Job-Work)</h3>
+                    <div id="gatePassBoard" class="overflow-auto"></div>
+                </div>
+                <div class="bg-dark-surface rounded-lg border border-dark p-4">
+                    <h3 class="text-lg font-semibold mb-3">Vendor Workload &amp; Tax Volume Caps</h3>
+                    <div id="vendorBoard" class="overflow-auto"></div>
+                </div>
+            </div>
+
+            <!-- Audit Trail / Project 360 -->
+            <div id="view-audit" class="view hidden">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <h2 class="text-2xl font-bold">Audit Trail</h2>
+                    <p class="text-xs text-dark-muted">Project 360 - stage advances, QC checks, gate passes and defects, oldest first</p>
+                </div>
+                <div id="auditContent" class="bg-dark-surface rounded-lg border border-dark p-4 overflow-auto"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast host -->
+    <div id="toastHost" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Modal host -->
+    <div id="modalHost" class="fixed inset-0 z-40 hidden">
+        <div class="absolute inset-0 bg-black/60" data-modal-close></div>
+        <div class="relative max-w-lg mx-auto mt-24 bg-dark-surface border border-dark rounded-lg p-6 shadow-xl">
+            <h3 id="modalTitle" class="text-lg font-semibold mb-4"></h3>
+            <div id="modalBody" class="space-y-3"></div>
+            <div class="flex justify-end gap-2 mt-6">
+                <button class="btn-secondary py-2 px-4 rounded-md text-sm" data-modal-close>Cancel</button>
+                <button id="modalConfirm" class="btn-primary py-2 px-4 rounded-md text-sm">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // =========================================================================
+    // Schemas & constants (Phase 1 foundation)
+    // =========================================================================
+    // 18-stage production routing, grouped into 5 departments (Phase 3).
+    // Weights drive the per-item progress bar; QC gates are enforced per department.
+    const PRODUCTION_STAGES = [
+        { no: 1,  dept: 'Carpentry',  name: 'Preparation & Cutting',        weight: 2 },
+        { no: 2,  dept: 'Carpentry',  name: 'Shaping & Profiling',          weight: 2 },
+        { no: 3,  dept: 'Carpentry',  name: 'Joinery & Assembly',           weight: 3 },
+        { no: 4,  dept: 'Carpentry',  name: 'Sanding & Finishing',          weight: 1 },
+        { no: 5,  dept: 'Veneering',  name: 'Cutting & Pasting',            weight: 2 },
+        { no: 6,  dept: 'Veneering',  name: 'Sanding',                      weight: 1 },
+        { no: 7,  dept: 'Job-Work',   name: 'Metalworks',                   weight: 1 },
+        { no: 8,  dept: 'Job-Work',   name: 'Lathe Works',                  weight: 1 },
+        { no: 9,  dept: 'Job-Work',   name: 'Cane/Rattan Weaving',          weight: 1 },
+        { no: 10, dept: 'Job-Work',   name: 'Cord/Carving/Specialist',       weight: 1 },
+        { no: 11, dept: 'Polish',     name: 'Sanding',                      weight: 1 },
+        { no: 12, dept: 'Polish',     name: 'Staining & Sealer',            weight: 2 },
+        { no: 13, dept: 'Polish',     name: 'Color Correction & Top Coat',  weight: 2 },
+        { no: 14, dept: 'Polish',     name: 'Fine Sanding & Touchup',       weight: 1 },
+        { no: 15, dept: 'Upholstery', name: 'Webbing & Springs',            weight: 1 },
+        { no: 16, dept: 'Upholstery', name: 'Foaming',                      weight: 1 },
+        { no: 17, dept: 'Upholstery', name: 'Fabric Cutting & Stitching',   weight: 1 },
+        { no: 18, dept: 'Upholstery', name: 'Fabric Fitting',               weight: 1 }
+    ];
+    const STAGE_DEPARTMENTS = ['Carpentry', 'Veneering', 'Job-Work', 'Polish', 'Upholstery'];
+    const STAGE_TOTAL_WEIGHT = PRODUCTION_STAGES.reduce((a, s) => a + s.weight, 0);
+    const QC_PENDING = 'pending', QC_PASSED = 'passed', QC_FAILED = 'failed';
+
+    const ProductionStageSchema = PRODUCTION_STAGES;
+    const StageCategories = STAGE_DEPARTMENTS.reduce((acc, d) => {
+        acc[d] = PRODUCTION_STAGES.filter(s => s.dept === d).map(s => s.no);
+        return acc;
+    }, {});
+
+    function stageDef(index) { return PRODUCTION_STAGES[index] || null; }
+    function departmentOfStage(index) { const s = PRODUCTION_STAGES[index]; return s ? s.dept : null; }
+    function precedingDepartments(dept) {
+        const i = STAGE_DEPARTMENTS.indexOf(dept);
+        return i <= 0 ? [] : STAGE_DEPARTMENTS.slice(0, i);
+    }
+    // QC hard gate: an item may not enter a department until every earlier
+    // department's QC inspection is logged as passed.
+    function stageGateMissing(item, index) {
+        const dept = departmentOfStage(index);
+        if (!dept) return [];
+        const qc = item.departmentQc || {};
+        return precedingDepartments(dept).filter(d => qc[d] !== QC_PASSED);
+    }
+    function completedSet(item) {
+        const done = {};
+        (item.completedStages || []).forEach(n => { done[n] = true; });
+        return done;
+    }
+    function nextStageIndex(item) {
+        const done = completedSet(item);
+        for (let i = 0; i < PRODUCTION_STAGES.length; i++) if (!done[PRODUCTION_STAGES[i].no]) return i;
+        return PRODUCTION_STAGES.length;
+    }
+    function itemProgress(item) {
+        const done = completedSet(item);
+        const got = PRODUCTION_STAGES.reduce((a, s) => a + (done[s.no] ? s.weight : 0), 0);
+        return Math.round(got / STAGE_TOTAL_WEIGHT * 100);
+    }
+    function itemStageLabel(item) {
+        const i = nextStageIndex(item);
+        const s = stageDef(i);
+        return s ? (s.dept + ' - ' + s.name) : 'Completed';
+    }
+    function createProductionItem(line, estimatedHours) {
+        return {
+            item: line.item || null,
+            description: line.description || '',
+            qty: line.qty || 0,
+            projectCode: null,
+            assignedCarpenter: null,
+            deadline: null,
+            estimatedHours: estimatedHours || 0,
+            completedStages: [],
+            departmentQc: {},
+            is_quarantined: false,
+            defect: null
+        };
+    }
+    function createEmptyProductionState() {
+        return {
+            workOrderId: null, salesOrderKey: null,
+            items: [],
+            stages: PRODUCTION_STAGES.map(s => ({ no: s.no, dept: s.dept, name: s.name, weight: s.weight, status: 'pending' })),
+            currentStage: null, status: 'not_started',
+            assignedCarpenters: [], qcLogs: [], reworkHistory: [],
+            productionStartDate: null, productionEndDate: null,
+            estimatedHours: 0, carpenterCapacityHours: 40,
+            priority: 'normal', updatedAt: new Date().toISOString(), version: 1
+        };
+    }
+    function createEmptyPlankRegister() { return { planks: [] }; }
+
+    // =========================================================================
+    // Phase 4 - materials (plank register) & procurement constants
+    // =========================================================================
+    // Placement UUID for Inventory Item documents (used when lazily creating
+    // the "Item Subledger JSON" field). Read from the live "Category" field.
+    const INVENTORY_ITEM_TYPE = '0dbdbf8a-d80c-48e6-b453-bb7862445b7c';
+    const SUBLEDGER_FIELD = 'Item Subledger JSON';
+    const PLANK_PREFIX = 'LHR-26-';
+    const PLANK_AVAILABLE = 'Available';
+    const PLANK_RESERVED = 'Reserved';
+    const PR_PREFIX = 'PR-';
+    const PO_PREFIX = 'PO-';
+    const WOOD_KEYWORDS = ['wood', 'timber', 'plank', 'lumber', 'log', 'teak', 'pine',
+        'sheesham', 'oak', 'ash', 'walnut', 'deodar', 'maple', 'beech', 'sal', 'mdf', 'ply', 'veneer'];
+    function num2(n) { const v = Number(n); return isFinite(v) ? Math.round(v * 100) / 100 : 0; }
+    // Board-foot volume of a plank given inches: CFT = L * W * T / 1728.
+    function plankCft(l, w, t) {
+        return num2((Number(l) || 0) * (Number(w) || 0) * (Number(t) || 0) / 1728);
+    }
+    function pad4(n) { return String(n).padStart(4, '0'); }
+    function pad3(n) { return String(n).padStart(3, '0'); }
+
+    // =========================================================================
+    // Phase 5 - subcontractors & gate passes constants
+    // =========================================================================
+    // Outsourced work is the Job-Work department (Metalworks, Lathe, Cane/Rattan,
+    // Cord/Carving). Items sitting at these stages physically leave the factory.
+    const OUTSOURCED_STAGES = PRODUCTION_STAGES.filter(s => s.dept === 'Job-Work').map(s => s.no);
+    const TAX_VOLUME_CAP = 500000;
+    const GATE_OUTBOUND = 'Outbound';
+    const GATE_RETURNED = 'Returned';
+
+    // CRM lifecycle (maps onto the configured "Lead Status" dropdown: New / Qualified / Converted)
+    const CRMStatus = { LEAD: 'New', QUALIFIED: 'Qualified', CONVERTED: 'Converted' };
+
+    // Pipeline lifecycle states. Kept in a plain-text "CRM Lifecycle" custom
+    // field because the live "CRM State" dropdown only accepts Opportunity/Quote.
+    const QUOTE_STATE = {
+        DRAFT: 'Draft', SHARED: 'Shared with Client', NEGOTIATION: 'Negotiation',
+        APPROVED: 'Approved', SUPERSEDED: 'Superseded', DESIGN_PENDING: 'Design Pending',
+        CONVERTED: 'Converted to Order'
+    };
+    // The only two values the live "CRM State" dropdown accepts.
+    const CRM_STATE = { OPPORTUNITY: 'Opportunity', QUOTE: 'Quote' };
+    const POST_APPROVAL_STATES = [QUOTE_STATE.APPROVED, QUOTE_STATE.DESIGN_PENDING, QUOTE_STATE.CONVERTED];
+    const LIFECYCLE_FIELD = 'CRM Lifecycle';
+    function crmStateFor(lifecycle, priorCrmState) {
+        if (lifecycle === QUOTE_STATE.SUPERSEDED) {
+            return priorCrmState === CRM_STATE.QUOTE ? CRM_STATE.QUOTE : CRM_STATE.OPPORTUNITY;
+        }
+        return POST_APPROVAL_STATES.indexOf(lifecycle) !== -1 ? CRM_STATE.QUOTE : CRM_STATE.OPPORTUNITY;
+    }
+    const KANBAN_COLUMNS = [QUOTE_STATE.DRAFT, QUOTE_STATE.SHARED, QUOTE_STATE.NEGOTIATION, QUOTE_STATE.APPROVED];
+
+    // Custom field UUIDs, discovered live at load time; these are the known fallbacks.
+    const CF_UUID = {
+        'Lead Status':      '01a14a63-8701-7e56-9f01-55c7b6575c64',
+        'CRM Notes':        '01a14a65-26e7-7778-9cc0-6b26181a5fc8',
+        'CRM State':        '01a14a65-ded5-7547-ac25-7c23da9fe224',
+        'Pipeline Stage':   '01a14a67-3e02-7854-ac6b-797b49fe3415',
+        'CRM':              '01a07133-7793-7426-98a8-676d8dbebe78',
+        'Master Reference': '01a14a6a-6aad-7c2c-ada5-673b44c75ad8',
+        'Production State': '01a14ca0-7a0b-7954-b49e-b0a51515f618',
+        'BOM JSON':         null,
+        'CRM Lifecycle':    null,
+        'Item Subledger JSON': null
+    };
+    // Document-type placement UUID for Sales Quote (used when lazily creating "BOM JSON").
+    const SALES_QUOTE_TYPE = 'ba89de75-cb87-4bde-b20f-314f01b31037';
+
+    // =========================================================================
+    // Manager.io bridge (official extension protocol)
+    // =========================================================================
+    function postMessageWithResponse(message) {
+        return new Promise((resolve, reject) => {
+            const requestId = crypto.randomUUID();
+            const timer = setTimeout(() => {
+                window.removeEventListener('message', handler);
+                reject(new Error('Timeout - make sure this page is running inside Manager.io'));
+            }, 15000);
+            function handler(event) {
+                if (event.data && typeof event.data.type === 'string' &&
+                    event.data.type.endsWith('-response') && event.data.requestId === requestId) {
+                    clearTimeout(timer);
+                    window.removeEventListener('message', handler);
+                    resolve(event.data.body);
+                }
+            }
+            window.addEventListener('message', handler);
+            window.parent.postMessage(Object.assign({}, message, { requestId }), '*');
+        });
+    }
+
+    async function apiRequest(method, path, body) {
+        const message = { type: 'api-request', method: method, path: path };
+        if (body !== undefined) message.body = body;
+        beginBusy();
+        try {
+            return await postMessageWithResponse(message);
+        } finally {
+            endBusy();
+        }
+    }
+    const apiGet = (path) => apiRequest('GET', path);
+    const apiPost = (path, body) => apiRequest('POST', path, body);
+    const apiPut = (path, body) => apiRequest('PUT', path, body);
+
+    // Manager returns ErrorResponse objects for 4xx; surface them as exceptions.
+    function assertOk(res) {
+        if (res && typeof res === 'object' && !Array.isArray(res) &&
+            (res.error || res.message) && Object.keys(res).length <= 3) {
+            throw new Error(res.message || res.error);
+        }
+        return res;
+    }
+    function asRows(res) {
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray(res.rows)) return res.rows;
+        if (res && Array.isArray(res.items)) return res.items;
+        if (res && Array.isArray(res.Items)) return res.Items;
+        return [];
+    }
+    // Paginated fetch; tolerates endpoints that ignore skip/pageSize and return everything.
+    async function apiListAll(path, pageSize) {
+        pageSize = pageSize || 100;
+        let all = [], skip = 0, guard = 0;
+        while (true) {
+            const sep = path.indexOf('?') >= 0 ? '&' : '?';
+            const res = assertOk(await apiGet(path + sep + 'skip=' + skip + '&pageSize=' + pageSize));
+            const rows = asRows(res);
+            if (rows.length > pageSize) return rows;            // endpoint ignored paging
+            all = all.concat(rows);
+            if (rows.length < pageSize || guard++ > 500) break;
+            skip += pageSize;
+        }
+        return all;
+    }
+    // Manager single-record reads take the key as a query parameter: GET /api4/customer?Key=<uuid>
+    const apiGetOne = (entityPath, key) => apiGet(entityPath + '?Key=' + encodeURIComponent(key));
+
+    // List rows omit custom fields and line items, so fetch full records (bounded concurrency).
+    async function hydrateAll(rows, entityPath, concurrency) {
+        concurrency = concurrency || 8;
+        const out = new Array(rows.length);
+        let cursor = 0;
+        async function worker() {
+            while (true) {
+                const idx = cursor++;
+                if (idx >= rows.length) return;
+                const row = rows[idx];
+                const key = row.key || row.Key;
+                try {
+                    const full = assertOk(await apiGetOne(entityPath, key));
+                    if (full && typeof full === 'object' && !full.key && !full.Key) full.key = key;
+                    out[idx] = full;
+                } catch (e) {
+                    console.warn('Hydrate failed for ' + key, e);
+                    toastApiError(e);
+                    out[idx] = row;
+                }
+            }
+        }
+        const n = Math.min(concurrency, rows.length);
+        await Promise.all(Array.from({ length: n }, worker));
+        return out;
+    }
+
+    // =========================================================================
+    // Custom field helpers
+    // =========================================================================
+    function cfKey(name) {
+        return KEEL.cfMap[name] || CF_UUID[name] || null;
+    }
+    function cfGet(record, name) {
+        if (!record) return null;
+        const id = cfKey(name);
+        if (!id) return null;
+        const pascal = record.CustomFields2 && record.CustomFields2.Strings;
+        const camel = record.customFields2 && record.customFields2.strings;
+        if (pascal && pascal[id] !== undefined) return pascal[id];
+        if (camel && camel[id] !== undefined) return camel[id];
+        return null;
+    }
+    function cfSet(record, name, value) {
+        const id = cfKey(name);
+        if (!id) throw new Error('Custom field not available: ' + name);
+        if (!record.CustomFields2) record.CustomFields2 = {};
+        if (!record.CustomFields2.Strings) record.CustomFields2.Strings = {};
+        record.CustomFields2.Strings[id] = value;
+        if (record.customFields2) {
+            if (!record.customFields2.strings) record.customFields2.strings = {};
+            record.customFields2.strings[id] = value;
+        }
+        return record;
+    }
+    // Fine-grained lifecycle of a quote, stored in the plain-text field.
+    function lifecycleOf(quote) {
+        if (!quote) return null;
+        return cfGet(quote, LIFECYCLE_FIELD) || null;
+    }
+    function parseCustomJson(value) {
+        if (value === null || value === undefined || value === '') return null;
+        try { return JSON.parse(value); } catch (e) { console.error('Bad custom JSON', e); return null; }
+    }
+    const stringifyCustomJson = (obj) => JSON.stringify(obj);
+
+    // =========================================================================
+    // RBAC, toast, small utilities
+    // =========================================================================
+    function currentRole() {
+        const el = document.getElementById('role-selector');
+        return el ? el.value : 'admin';
+    }
+    function requireRole(roles) {
+        if (roles.indexOf(currentRole()) === -1) {
+            toast('Not Authorized - this action needs: ' + roles.join(', '), 'error');
+            return false;
+        }
+        return true;
+    }
+
+    // =========================================================================
+    // Phase 6 - central permission matrix + UI enforcement
+    // =========================================================================
+    // Action names are snake_case and match data-action with '-' replaced by '_'.
+    const PERMISSIONS = {
+        admin: ['*'],
+        sales_manager: ['convert_lead', 'revise_quote', 'approve_quote', 'view_audit', 'refresh'],
+        sales_rep: ['convert_lead', 'revise_quote', 'refresh'],
+        cost_engineer: ['attach_bom', 'convert_lead', 'revise_quote', 'refresh'],
+        production_manager: ['advance_stage', 'report_defect', 'release_quarantine', 'assign_carpenter',
+            'receive_planks', 'issue_planks', 'generate_pr', 'issue_gate_pass', 'log_inward', 'refresh'],
+        procurement: ['generate_pr', 'approve_pr', 'issue_gate_pass', 'log_inward', 'refresh'],
+        finance: ['confirm_payment', 'approve_quote', 'refresh']
+    };
+    // Older links / cached UI may still select these role ids.
+    const LEGACY_ROLE_ALIASES = { designer: 'cost_engineer', floor_manager: 'production_manager' };
+    function resolveRole(role) {
+        let r = role || currentRole();
+        let hops = 0;
+        while (LEGACY_ROLE_ALIASES[r] && hops++ < 4) r = LEGACY_ROLE_ALIASES[r];
+        return r;
+    }
+    function permissionsFor(role) { return PERMISSIONS[resolveRole(role)] || []; }
+    function hasPermission(action, role) {
+        const perms = permissionsFor(role);
+        if (!perms.length) return false;
+        return perms.indexOf('*') !== -1 || perms.indexOf(action) !== -1;
+    }
+    // Logic enforcement: every write action calls this before any POST/PUT.
+    function requirePermission(action, role) {
+        if (!hasPermission(action, role)) {
+            toast('Not Authorized - your role cannot perform: ' + String(action).replace(/_/g, ' '), 'error');
+            return false;
+        }
+        return true;
+    }
+    const permissionForAction = (action) => String(action).replace(/-/g, '_');
+    // UI enforcement: hide anything the current role may not run.
+    function applyRolePermissions() {
+        const role = currentRole();
+        if (typeof document.querySelectorAll !== 'function') return;
+        document.querySelectorAll('[data-action]').forEach(btn => {
+            const allowed = hasPermission(permissionForAction(btn.dataset.action || ''), role);
+            btn.style.display = allowed ? '' : 'none';
+            if (!allowed) btn.disabled = true;
+            else if (!btn.dataset.proc) btn.disabled = false;
+        });
+        document.querySelectorAll('[data-route]').forEach(btn => {
+            const allowed = btn.dataset.route === 'audit' ? hasPermission('view_audit', role) : true;
+            btn.style.display = allowed ? '' : 'none';
+        });
+    }
+    function auditVisible() { return hasPermission('view_audit'); }
+
+    // =========================================================================
+    // Phase 6 - friendly errors + shared empty states
+    // =========================================================================
+    function friendlyError(e) {
+        const msg = String((e && e.message) || e || 'Unknown error');
+        if (/timeout/i.test(msg)) return 'Connection to Manager.io timed out. Please check this page is open inside Manager.io.';
+        if (/failed to fetch|networkerror|network error|err_connection|load failed/i.test(msg)) {
+            return 'Failed to save to Manager.io. Please check connection.';
+        }
+        return msg;
+    }
+    let lastErrorToastAt = 0;
+    function toastApiError(e) {
+        const now = Date.now();
+        if (now - lastErrorToastAt < 2500) return;
+        lastErrorToastAt = now;
+        toast(friendlyError(e), 'error');
+    }
+    function emptyState(title, message) {
+        return '<div class="border border-dashed border-dark rounded-lg p-8 text-center">' +
+            '<p class="text-dark-muted font-semibold mb-1">' + escapeHtml(title) + '</p>' +
+            '<p class="text-sm text-dark-muted">' + escapeHtml(message) + '</p></div>';
+    }
+
+    function toast(msg, kind) {
+        const host = document.getElementById('toastHost');
+        if (!host) return;
+        const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-slate-600' };
+        const div = document.createElement('div');
+        div.className = 'toast text-white text-sm rounded-md py-2 px-4 shadow-lg ' + (colors[kind] || colors.info);
+        div.textContent = msg;
+        host.appendChild(div);
+        setTimeout(() => { div.style.opacity = '0'; div.style.transition = 'opacity .3s'; }, 3200);
+        setTimeout(() => div.remove(), 3600);
+    }
+    async function withProcessing(btn, fn) {
+        const original = btn ? btn.textContent : null;
+        if (btn) { btn.disabled = true; btn.dataset.proc = '1'; btn.textContent = 'Processing...'; }
+        try {
+            await fn();
+        } catch (err) {
+            console.error(err);
+            toast(friendlyError(err), 'error');
+        } finally {
+            if (btn) { delete btn.dataset.proc; btn.disabled = false; btn.textContent = original; }
+            applyRolePermissions();
+        }
+    }
+    // Global processing state while any bridge request is in flight.
+    let busyDepth = 0;
+    function setBusyUi(busy) {
+        const pill = document.getElementById('busyIndicator');
+        if (pill) { if (busy) pill.classList.remove('hidden'); else pill.classList.add('hidden'); }
+        if (typeof document.querySelectorAll !== 'function') return;
+        document.querySelectorAll('[data-action]').forEach(b => { b.disabled = busy; });
+        if (!busy) applyRolePermissions();
+    }
+    function beginBusy() { busyDepth++; if (busyDepth === 1) setBusyUi(true); }
+    function endBusy() { busyDepth = Math.max(0, busyDepth - 1); if (busyDepth === 0) setBusyUi(false); }
+    function escapeHtml(s) {
+        return String(s === null || s === undefined ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function stamp() {
+        const d = new Date();
+        const p = (n) => String(n).padStart(2, '0');
+        return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+    }
+    function bumpRevision(ref) {
+        ref = (ref || 'SQ').trim();
+        const m = ref.match(/^(.*?)(?:\s*Rev\s*(\d+))\s*$/i);
+        if (m) return m[1] + ' Rev ' + (parseInt(m[2], 10) + 1);
+        return ref + ' Rev 1';
+    }
+    function newKeyOf(res) {
+        if (typeof res === 'string') return res;
+        if (res && typeof res.key === 'string') return res.key;
+        if (res && typeof res.Key === 'string') return res.Key;
+        if (res && res.value && typeof res.value.key === 'string') return res.value.key;
+        return null;
+    }
+
+    // =========================================================================
+    // Application state + namespace
+    // =========================================================================
+    const KEEL = {
+        data: { customers: [], inventoryItems: [], salesQuotes: [], salesOrders: [], suppliers: [], purchaseOrders: [] },
+        cfMap: {},
+        fullItems: {},
+        plankSeq: 0,
+        selectedPlankItem: null,
+        loaded: false,
+        lastUpdated: null,
+
+        customerName(key) {
+            const c = this.data.customers.find(x => (x.key || x.Key) === key);
+            return c ? (c.name || c.Name) : '(unknown)';
+        },
+        customerByKey(key) {
+            return this.data.customers.find(x => (x.key || x.Key) === key) || null;
+        },
+        supplierName(key) {
+            const s = this.data.suppliers.find(x => (x.key || x.Key) === key);
+            return s ? (s.name || s.Name) : '(unknown supplier)';
+        },
+        quoteByKey(key) {
+            return this.data.salesQuotes.find(x => (x.key || x.Key) === key) || null;
+        },
+
+        // Discover custom fields so the app adapts to Keel's live configuration.
+        async loadCustomFields() {
+            try {
+                const rows = asRows(assertOk(await apiGet('/api4/text-custom-fields?pageSize=200')));
+                rows.forEach(f => {
+                    const name = f.name || f.Name;
+                    const key = f.key || f.Key;
+                    if (name && key) this.cfMap[name] = key;
+                });
+            } catch (e) {
+                console.warn('Custom field discovery failed, using fallbacks', e);
+                toastApiError(e);
+            }
+        },
+
+        // Create a plain-text (Type 1) custom field on demand.
+        async ensureTextField(name, placement) {
+            if (this.cfMap[name]) return this.cfMap[name];
+            try {
+                const res = assertOk(await apiPost('/api4/text-custom-field', {
+                    value: {
+                        Name: name,
+                        Placement: placement || [SALES_QUOTE_TYPE],
+                        Type: 1,
+                        DisplayOnView: true
+                    }
+                }));
+                const key = newKeyOf(res);
+                if (!key) throw new Error('no key returned for "' + name + '"');
+                this.cfMap[name] = key;
+                toast('Created "' + name + '" custom field', 'info');
+                return key;
+            } catch (e) {
+                console.warn('Could not create custom field "' + name + '"', e);
+                toastApiError(e);
+                return null;
+            }
+        },
+
+        // Create the "BOM JSON" text field on Sales Quote on demand.
+        async ensureBomField() {
+            const key = await this.ensureTextField('BOM JSON');
+            if (!key) throw new Error('Could not create BOM JSON custom field');
+            return key;
+        },
+
+        // Create the "Item Subledger JSON" text field on Inventory Item on demand.
+        async ensureSubledgerField() {
+            const key = await this.ensureTextField(SUBLEDGER_FIELD, [INVENTORY_ITEM_TYPE]);
+            if (!key) throw new Error('Could not create Item Subledger JSON custom field');
+            return key;
+        },
+
+        // Persist the fine-grained lifecycle in a text field and mirror the
+        // validated Opportunity/Quote value into the "CRM State" dropdown.
+        async setLifecycle(quote, lifecycle, priorCrmState) {
+            await this.ensureTextField(LIFECYCLE_FIELD);
+            if (cfKey(LIFECYCLE_FIELD)) cfSet(quote, LIFECYCLE_FIELD, lifecycle);
+            cfSet(quote, 'CRM State', crmStateFor(lifecycle, priorCrmState));
+            return quote;
+        },
+
+        async initLoadData(opts) {
+            opts = opts || {};
+            const onProgress = opts.onProgress || function () {};
+            onProgress(5, 'Discovering custom fields...');
+            await this.loadCustomFields();
+            this.fullItems = {};
+
+            onProgress(20, 'Fetching Customers...');
+            const custRows = await apiListAll('/api4/customers', 100);
+            onProgress(30, 'Loading customer details (' + custRows.length + ')...');
+            this.data.customers = await hydrateAll(custRows, '/api4/customer', 8);
+            onProgress(45, 'Customers: ' + this.data.customers.length);
+
+            onProgress(50, 'Fetching Inventory Items...');
+            this.data.inventoryItems = await apiListAll('/api4/inventory-items', 200);
+            onProgress(65, 'Inventory Items: ' + this.data.inventoryItems.length);
+
+            onProgress(75, 'Fetching Sales Quotes...');
+            const quoteRows = await apiListAll('/api4/sales-quotes', 100);
+            onProgress(80, 'Loading quote details (' + quoteRows.length + ')...');
+            this.data.salesQuotes = await hydrateAll(quoteRows, '/api4/sales-quote', 8);
+            onProgress(88, 'Sales Quotes: ' + this.data.salesQuotes.length);
+
+            onProgress(90, 'Fetching Sales Orders...');
+            const orderRows = await apiListAll('/api4/sales-orders', 100);
+            this.data.salesOrders = await hydrateAll(orderRows, '/api4/sales-order', 8);
+
+            onProgress(95, 'Fetching Suppliers...');
+            this.data.suppliers = await apiListAll('/api4/suppliers', 100);
+
+            onProgress(97, 'Fetching Purchase Orders...');
+            const poRows = await apiListAll('/api4/purchase-orders', 100);
+            this.data.purchaseOrders = await hydrateAll(poRows, '/api4/purchase-order', 8);
+            onProgress(100, 'Purchase Orders: ' + this.data.purchaseOrders.length);
+
+            this.loaded = true;
+            this.lastUpdated = new Date().toISOString();
+            this.renderAll();
+            return this.data;
+        },
+
+        renderAll() {
+            renderDashboard();
+            renderCRM();
+            renderPipeline();
+            renderDesign();
+            renderProduction();
+            renderQc();
+            renderCapacity();
+            renderMaterials();
+            renderProcurement();
+            renderSubcontractors();
+            renderAudit();
+            applyRolePermissions();
+        }
+    };
+    window.KEEL = KEEL;
+    // Backwards-friendly alias
+    window.KEEL.initLoadData = KEEL.initLoadData.bind(KEEL);
+
+    // =========================================================================
+    // Router
+    // =========================================================================
+    let currentRoute = 'dashboard';
+    function initRouter() {
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => navigateTo(btn.dataset.route));
+        });
+    }
+    function navigateTo(route) {
+        if (route === 'audit' && !hasPermission('view_audit')) {
+            toast('Not Authorized - the Audit Trail is limited to Admin and Sales Manager', 'error');
+            route = 'dashboard';
+        }
+        currentRoute = route;
+        document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+        const target = document.getElementById('view-' + route);
+        if (target) target.classList.remove('hidden');
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('bg-blue-600');
+            btn.classList.add('btn-secondary');
+            if (btn.dataset.route === route) {
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('bg-blue-600');
+            }
+        });
+        // Refresh the active view from current in-memory data
+        if (route === 'dashboard') renderDashboard();
+        if (route === 'crm') renderCRM();
+        if (route === 'pipeline') renderPipeline();
+        if (route === 'design') renderDesign();
+        if (route === 'production') renderProduction();
+        if (route === 'qc') renderQc();
+        if (route === 'capacity') renderCapacity();
+        if (route === 'materials') renderMaterials();
+        if (route === 'procurement') renderProcurement();
+        if (route === 'subcontractors') renderSubcontractors();
+        if (route === 'audit') renderAudit();
+        applyRolePermissions();
+    }
+
+    // =========================================================================
+    // Splash / load sequence
+    // =========================================================================
+    async function initialLoad() {
+        const btn = document.getElementById('loadDataBtn');
+        const status = document.getElementById('loadStatus');
+        const progress = document.getElementById('loadProgress');
+        const bar = document.getElementById('progressBar');
+        const text = document.getElementById('progressText');
+        btn.disabled = true;
+        btn.textContent = 'Loading...';
+        status.classList.remove('hidden');
+        progress.classList.remove('hidden');
+        status.textContent = 'Connecting to Manager.io...';
+        try {
+            await KEEL.initLoadData({
+                onProgress: (pct, msg) => { bar.style.width = pct + '%'; text.textContent = msg; }
+            });
+            status.textContent = 'All data loaded successfully.';
+            status.classList.remove('text-dark-muted');
+            status.classList.add('text-green-400');
+            setTimeout(() => {
+                document.getElementById('splashScreen').classList.add('hidden');
+                const app = document.getElementById('appContainer');
+                app.classList.remove('hidden');
+                app.classList.add('flex');
+                navigateTo('dashboard');
+            }, 700);
+        } catch (err) {
+            console.error(err);
+            const friendly = friendlyError(err);
+            status.textContent = 'Error: ' + friendly;
+            status.classList.remove('text-dark-muted');
+            status.classList.add('text-red-400');
+            toast(friendly, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Retry Load Data';
+        }
+    }
+
+    // =========================================================================
+    // Dashboard
+    // =========================================================================
+    function renderDashboard() {
+        const host = document.getElementById('dashboardKPIs');
+        if (!host) return;
+        const orders = KEEL.data.salesOrders;
+        const quotes = KEEL.data.salesQuotes;
+        const activeOrders = orders.filter(o => !o.Cancelled).length;
+        const today = new Date();
+        let delayed = 0, quarantine = 0;
+        orders.forEach(o => {
+            if (o.Cancelled) return;
+            const ps = parseCustomJson(cfGet(o, 'Production State'));
+            if (ps) {
+                const q = (ps.items || []).filter(it => it.is_quarantined).length;
+                if (q) quarantine += q;
+                else if (ps.status === 'qc_quarantine') quarantine++;
+            }
+            const due = o.DueDate || o.Date;
+            if (due) { const d = new Date(due); if (!isNaN(d) && d < today) delayed++; }
+        });
+        if (!orders.length && !quotes.length && !KEEL.data.customers.length) {
+            host.innerHTML = emptyState('Welcome to Keel Furniture MES & CRM',
+                'No records yet in Manager.io. Add a customer lead or load data to populate the dashboard.');
+            const st0 = document.getElementById('dashStatus');
+            if (st0) st0.textContent = 'Nothing loaded yet - 0 customers, 0 items, 0 quotes, 0 orders.';
+            return;
+        }
+        const kpis = [
+            { label: 'Active Orders', value: activeOrders, color: 'text-blue-400' },
+            { label: 'Delayed Orders', value: delayed, color: 'text-red-400' },
+            { label: 'Open Quotes', value: quotes.filter(q => {
+                const s = lifecycleOf(q);
+                return s !== QUOTE_STATE.SUPERSEDED && s !== QUOTE_STATE.CONVERTED;
+            }).length, color: 'text-amber-400' },
+            { label: 'QC Quarantine', value: quarantine, color: 'text-orange-400' },
+            { label: 'Customers', value: KEEL.data.customers.length, color: 'text-slate-100' }
+        ];
+        host.innerHTML = kpis.map(k => (
+            '<div class="bg-dark-surface rounded-lg border border-dark p-4">' +
+            '<h4 class="text-sm text-dark-muted mb-2">' + k.label + '</h4>' +
+            '<p class="text-2xl font-bold ' + k.color + '">' + k.value + '</p></div>'
+        )).join('');
+        const st = document.getElementById('dashStatus');
+        if (st) st.textContent = 'Loaded ' + KEEL.data.customers.length + ' customers, ' +
+            KEEL.data.inventoryItems.length + ' items, ' + quotes.length + ' quotes, ' +
+            orders.length + ' orders from Manager.io.';
+    }
+
+    // =========================================================================
+    // CRM view - Leads / Active Customers
+    // =========================================================================
+    let crmTab = 'leads';
+    function leadStatusOf(customer) {
+        return cfGet(customer, 'Lead Status') || '';
+    }
+    function renderCRM() {
+        const host = document.getElementById('crmContent');
+        if (!host) return;
+        const customers = KEEL.data.customers;
+        const leads = customers.filter(c => {
+            const s = leadStatusOf(c);
+            return s === CRMStatus.LEAD || s === CRMStatus.QUALIFIED;
+        });
+        // "No status" is treated as an Active Customer per spec.
+        const active = customers.filter(c => {
+            const s = leadStatusOf(c);
+            return s !== CRMStatus.LEAD && s !== CRMStatus.QUALIFIED;
+        });
+        document.querySelectorAll('.crm-tab').forEach(btn => {
+            const on = btn.dataset.tab === crmTab;
+            btn.classList.toggle('btn-primary', on);
+            btn.classList.toggle('btn-secondary', !on);
+        });
+        const list = crmTab === 'leads' ? leads : active;
+        if (!list.length) {
+            host.innerHTML = crmTab === 'leads'
+                ? emptyState('No leads yet', 'Customers in Manager.io with Lead Status "New" or "Qualified" appear here as leads you can convert into quotes.')
+                : emptyState('No active customers yet', 'Converted leads show up here with their receivables and CRM notes.');
+            return;
+        }
+        const head = crmTab === 'leads'
+            ? '<th class="text-left p-2">Code</th><th class="text-left p-2">Name</th><th class="text-left p-2">Lead Status</th><th class="text-left p-2">CRM Notes</th><th class="p-2"></th>'
+            : '<th class="text-left p-2">Code</th><th class="text-left p-2">Name</th><th class="text-left p-2">Lead Status</th><th class="text-left p-2">Receivable</th>';
+        const rows = list.map(c => {
+            const key = c.key || c.Key;
+            const code = escapeHtml(c.code || c.Code || '');
+            const name = escapeHtml(c.name || c.Name || '');
+            const status = escapeHtml(leadStatusOf(c) || (crmTab === 'active' ? 'Active Customer' : ''));
+            const notes = escapeHtml(cfGet(c, 'CRM Notes') || '');
+            const recv = c.accountsReceivable ? c.accountsReceivable.value : '';
+            const action = crmTab === 'leads'
+                ? '<td class="p-2 text-right"><button class="btn-primary text-xs py-1 px-3 rounded-md" data-action="convert-lead" data-key="' + key + '">Convert to Customer & Opportunity</button></td>'
+                : '';
+            const extra = crmTab === 'leads'
+                ? '<td class="p-2 text-dark-muted">' + notes + '</td>'
+                : '<td class="p-2 text-dark-muted">' + (recv === '' ? '' : recv) + '</td>';
+            return '<tr class="border-t border-dark">' +
+                '<td class="p-2 text-dark-muted">' + code + '</td>' +
+                '<td class="p-2 font-medium">' + name + '</td>' +
+                '<td class="p-2">' + status + '</td>' + extra + action + '</tr>';
+        }).join('');
+        host.innerHTML = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' + head + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    async function convertLead(key, btn) {
+        if (!requirePermission('convert_lead')) return;
+        await withProcessing(btn, async () => {
+            const customer = assertOk(await apiGetOne('/api4/customer', key));
+            cfSet(customer, 'Lead Status', CRMStatus.CONVERTED);
+            assertOk(await apiPut('/api4/customer', { key: key, value: customer }));
+
+            const ref = 'SQ-' + stamp();
+            const quote = {
+                Customer: key,
+                IssueDate: new Date().toISOString(),
+                Reference: ref,
+                Lines: [],
+                CustomFields2: { Strings: {} }
+            };
+            cfSet(quote, 'CRM', 'Lead');
+            await KEEL.setLifecycle(quote, QUOTE_STATE.DRAFT);
+            assertOk(await apiPost('/api4/sales-quote', { value: quote }));
+
+            toast('Lead converted. Opportunity ' + ref + ' created.', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    // =========================================================================
+    // Pipeline kanban + quote lifecycle
+    // =========================================================================
+    function renderPipeline() {
+        const board = document.getElementById('pipelineBoard');
+        if (!board) return;
+        const quotes = KEEL.data.salesQuotes.filter(q => {
+            const s = lifecycleOf(q);
+            return s !== QUOTE_STATE.SUPERSEDED && s !== QUOTE_STATE.CONVERTED;
+        });
+        if (!quotes.length) {
+            board.innerHTML = emptyState('Pipeline is empty',
+                'Quotes appear here as leads are converted, then move across Draft, Shared, Negotiation and Approved.');
+            return;
+        }
+        board.innerHTML = KANBAN_COLUMNS.map(col => {
+            const items = quotes.filter(q => (lifecycleOf(q) || QUOTE_STATE.DRAFT) === col);
+            const cards = items.map(q => quoteCard(q, col)).join('') ||
+                '<p class="text-xs text-dark-muted p-2">No quotes in this stage yet.</p>';
+            return '<div class="kanban-col rounded-lg border border-dark p-3 min-h-[160px]">' +
+                '<h3 class="text-sm font-semibold mb-3 flex justify-between"><span>' + col + '</span>' +
+                '<span class="text-dark-muted">' + items.length + '</span></h3>' +
+                '<div class="space-y-2">' + cards + '</div></div>';
+        }).join('');
+    }
+
+    function quoteCard(q, col) {
+        const key = q.key || q.Key;
+        const ref = escapeHtml(q.Reference || q.reference || '(no ref)');
+        const cust = escapeHtml(KEEL.customerName(q.Customer || q.customer));
+        const crmStage = escapeHtml(cfGet(q, 'Pipeline Stage') || '');
+        const bom = parseCustomJson(cfGet(q, 'BOM JSON'));
+        let actions = '';
+        actions += '<button class="btn-secondary text-xs py-1 px-2 rounded" data-action="revise-quote" data-key="' + key + '">Revise</button>';
+        if (col !== QUOTE_STATE.APPROVED) {
+            actions += ' <button class="btn-success text-xs py-1 px-2 rounded" data-action="approve-quote" data-key="' + key + '">Approve</button>';
+        } else {
+            actions += ' <button class="btn-primary text-xs py-1 px-2 rounded" data-action="confirm-payment" data-key="' + key + '">Confirm Payment</button>';
+        }
+        return '<div class="kcard rounded-md p-3 border border-dark">' +
+            '<div class="flex justify-between items-start gap-2">' +
+            '<div><p class="font-semibold text-sm">' + ref + '</p>' +
+            '<p class="text-xs text-dark-muted">' + cust + '</p></div>' +
+            (crmStage ? '<span class="text-[10px] px-2 py-1 rounded bg-slate-900 text-dark-muted">' + crmStage + '</span>' : '') +
+            '</div>' +
+            (bom ? '<p class="text-[11px] text-green-400 mt-2">BOM: ' + escapeHtml((bom.expectedHours || '?') + 'h') + '</p>' : '') +
+            '<div class="mt-3 flex flex-wrap gap-1">' + actions + '</div>' +
+            '</div>';
+    }
+
+    async function reviseQuote(key, btn) {
+        if (!requirePermission('revise_quote')) return;
+        await withProcessing(btn, async () => {
+            const old = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const clone = JSON.parse(JSON.stringify(old));
+            delete clone.Key; delete clone.key; delete clone.id; delete clone.Id;
+            delete clone.Timestamp; delete clone.timestamp;
+            clone.Reference = bumpRevision(old.Reference || old.reference);
+            await KEEL.setLifecycle(clone, QUOTE_STATE.DRAFT);
+            assertOk(await apiPost('/api4/sales-quote', { value: clone }));
+
+            await KEEL.setLifecycle(old, QUOTE_STATE.SUPERSEDED, cfGet(old, 'CRM State'));
+            assertOk(await apiPut('/api4/sales-quote', { key: key, value: old }));
+
+            toast('Revision created: ' + clone.Reference + ' (previous superseded)', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    async function approveQuote(key, btn) {
+        if (!requirePermission('approve_quote')) return;
+        await withProcessing(btn, async () => {
+            const q = assertOk(await apiGetOne('/api4/sales-quote', key));
+            await KEEL.setLifecycle(q, QUOTE_STATE.APPROVED);
+            cfSet(q, 'CRM', 'Proposal Approved');
+            assertOk(await apiPut('/api4/sales-quote', { key: key, value: q }));
+            toast('Quote approved.', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    async function confirmPayment(key, btn) {
+        if (!requirePermission('confirm_payment')) return;
+        await withProcessing(btn, async () => {
+            const q = assertOk(await apiGetOne('/api4/sales-quote', key));
+            await KEEL.setLifecycle(q, QUOTE_STATE.DESIGN_PENDING);
+            cfSet(q, 'CRM', 'Payment Received');
+            assertOk(await apiPut('/api4/sales-quote', { key: key, value: q }));
+            toast('Payment confirmed. Quote released to Design Team.', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    // =========================================================================
+    // Design team view + BOM approval + order conversion
+    // =========================================================================
+    function renderDesign() {
+        const host = document.getElementById('designContent');
+        if (!host) return;
+        const pending = KEEL.data.salesQuotes.filter(q => lifecycleOf(q) === QUOTE_STATE.DESIGN_PENDING);
+        if (!pending.length) {
+            host.innerHTML = emptyState('Nothing awaiting design',
+                'Quotes move here after payment is confirmed, ready for a BOM, drawings and expected hours.');
+            return;
+        }
+        const rows = pending.map(q => {
+            const key = q.key || q.Key;
+            const bom = parseCustomJson(cfGet(q, 'BOM JSON'));
+            const bomText = bom
+                ? '<span class="text-green-400">Attached (' + (bom.expectedHours || '?') + 'h)</span>'
+                : '<span class="text-dark-muted">Not attached</span>';
+            return '<tr class="border-t border-dark">' +
+                '<td class="p-2 font-medium">' + escapeHtml(q.Reference || '') + '</td>' +
+                '<td class="p-2">' + escapeHtml(KEEL.customerName(q.Customer)) + '</td>' +
+                '<td class="p-2">' + bomText + '</td>' +
+                '<td class="p-2 text-right whitespace-nowrap">' +
+                '<button class="btn-secondary text-xs py-1 px-3 rounded-md" data-action="attach-bom" data-key="' + key + '">Attach BOM & Drawings</button> ' +
+                '<button class="btn-primary text-xs py-1 px-3 rounded-md" data-action="ceo-approve" data-key="' + key + '">CEO BOM Approval & Order Conversion</button>' +
+                '</td></tr>';
+        }).join('');
+        host.innerHTML = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+            '<th class="text-left p-2">Quote</th><th class="text-left p-2">Customer</th>' +
+            '<th class="text-left p-2">BOM</th><th class="p-2"></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function openModal(title, bodyHtml, onConfirm) {
+        const host = document.getElementById('modalHost');
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalBody').innerHTML = bodyHtml;
+        const confirmBtn = document.getElementById('modalConfirm');
+        const newBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+        newBtn.addEventListener('click', async () => {
+            await withProcessing(newBtn, async () => { await onConfirm(); closeModal(); });
+        });
+        host.classList.remove('hidden');
+    }
+    function closeModal() { document.getElementById('modalHost').classList.add('hidden'); }
+
+    async function attachBom(key, btn) {
+        if (!requirePermission('attach_bom')) return;
+        const q = KEEL.quoteByKey(key);
+        const existing = parseCustomJson(cfGet(q, 'BOM JSON')) || {};
+        const html =
+            '<label class="block text-xs text-dark-muted mb-1">Drawing URLs (one per line)</label>' +
+            '<textarea id="bom-drawings" rows="3" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' +
+            escapeHtml((existing.drawings || []).join('\n')) + '</textarea>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">BOM / Sheet URL</label>' +
+            '<input id="bom-url" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm" value="' + escapeHtml(existing.bomUrl || '') + '">' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Expected Production Hours</label>' +
+            '<input id="bom-hours" type="number" min="0" step="0.5" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm" value="' + escapeHtml(existing.expectedHours || '') + '">' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Estimator</label>' +
+            '<input id="bom-estimator" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm" value="' + escapeHtml(existing.estimator || '') + '">';
+        openModal('Attach BOM & Drawings - ' + (q.Reference || ''), html, async () => {
+            const drawings = document.getElementById('bom-drawings').value.split('\n').map(s => s.trim()).filter(Boolean);
+            const payload = {
+                drawings: drawings,
+                bomUrl: document.getElementById('bom-url').value.trim(),
+                expectedHours: parseFloat(document.getElementById('bom-hours').value) || 0,
+                estimator: document.getElementById('bom-estimator').value.trim(),
+                updatedAt: new Date().toISOString()
+            };
+            await KEEL.ensureBomField();
+            const fresh = assertOk(await apiGetOne('/api4/sales-quote', key));
+            cfSet(fresh, 'BOM JSON', stringifyCustomJson(payload));
+            assertOk(await apiPut('/api4/sales-quote', { key: key, value: fresh }));
+            toast('BOM & drawings saved.', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    async function ceoApprove(key, btn) {
+        if (!requirePermission('ceo_approve')) return;
+        const q = KEEL.quoteByKey(key);
+        const bom = parseCustomJson(cfGet(q, 'BOM JSON'));
+        if (!bom) { toast('Attach the BOM before approving.', 'error'); return; }
+        await withProcessing(btn, async () => {
+            const quote = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const masterRef = 'M-' + Date.now();
+
+            const ps = createEmptyProductionState();
+            ps.workOrderId = masterRef;
+            const lines = (quote.Lines || quote.lines || []);
+            const bomHours = (bom && bom.expectedHours) || 0;
+            const perItemHours = lines.length ? bomHours / lines.length : 0;
+            ps.estimatedHours = bomHours;
+            ps.items = lines.map(l => createProductionItem({
+                item: l.Item || l.item || null,
+                description: l.LineDescription || l.lineDescription || '',
+                qty: l.Qty || l.qty || 0
+            }, perItemHours));
+            ps.items.forEach(it => {
+                it.projectCode = masterRef;
+                it.deadline = quote.DueDate || null;
+            });
+
+            const order = {
+                Customer: quote.Customer || quote.customer,
+                Date: new Date().toISOString(),
+                Reference: masterRef,
+                SalesQuote: key,
+                BillingAddress: quote.BillingAddress || '',
+                Description: quote.Description || '',
+                Lines: (quote.Lines || quote.lines || []).map(l => Object.assign({}, l)),
+                CustomFields2: { Strings: {} }
+            };
+            cfSet(order, 'Master Reference', masterRef);
+            cfSet(order, 'Production State', stringifyCustomJson(ps));
+            assertOk(await apiPost('/api4/sales-order', { value: order }));
+
+            await KEEL.setLifecycle(quote, QUOTE_STATE.CONVERTED);
+            cfSet(quote, 'CRM', 'Work Order Generated');
+            assertOk(await apiPut('/api4/sales-quote', { key: key, value: quote }));
+
+            toast('Sales Order ' + masterRef + ' created from quote.', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    // =========================================================================
+    // Production floor, QC gates & capacity (Phase 3)
+    // =========================================================================
+    function psOf(order) { return parseCustomJson(cfGet(order, 'Production State')); }
+    function fieldVal(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+    function hours1(n) { return Math.round((n || 0) * 10) / 10; }
+
+    // Orders that carry a production state from quotes in Design Pending / Converted.
+    function activeWorkOrders() {
+        return KEEL.data.salesOrders.filter(o => {
+            if (o.Cancelled) return false;
+            const ps = psOf(o);
+            if (!ps) return false;
+            const q = KEEL.quoteByKey(o.SalesQuote || o.salesQuote);
+            if (q) {
+                const lc = lifecycleOf(q);
+                if (lc !== QUOTE_STATE.DESIGN_PENDING && lc !== QUOTE_STATE.CONVERTED) return false;
+            }
+            return true;
+        });
+    }
+    function productionRows() {
+        const rows = [];
+        activeWorkOrders().forEach(o => {
+            const ps = psOf(o);
+            const key = o.key || o.Key;
+            (ps.items || []).forEach((item, index) => rows.push({ order: o, orderKey: key, ps: ps, item: item, index: index }));
+        });
+        return rows;
+    }
+    function resolveRow(orderKey, index) {
+        const order = KEEL.data.salesOrders.find(o => (o.key || o.Key) === orderKey);
+        if (!order) return null;
+        const ps = psOf(order);
+        if (!ps || !ps.items || !ps.items[index]) return null;
+        return { order: order, orderKey: orderKey, ps: ps, item: ps.items[index], index: index };
+    }
+    function progressBar(pct) {
+        return '<div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">' +
+            '<div class="h-2 ' + (pct >= 100 ? 'bg-green-500' : 'bg-blue-500') + '" style="width:' + pct + '%"></div></div>';
+    }
+    function capacityByCarpenter() {
+        const map = {};
+        productionRows().forEach(r => {
+            const name = r.item.assignedCarpenter;
+            if (!name) return;
+            if (!map[name]) map[name] = { hours: 0, items: 0, capacity: r.ps.carpenterCapacityHours || 40 };
+            map[name].hours += (r.item.estimatedHours || 0);
+            map[name].items += 1;
+        });
+        return map;
+    }
+    function capacityBand(hours, capacity) {
+        const pct = capacity ? (hours / capacity) * 100 : 0;
+        if (pct >= 100) return { cls: 'text-red-400', text: hours1(hours) + 'h / ' + capacity + 'h - OVERLOAD WARNING' };
+        if (pct >= 85) return { cls: 'text-amber-400', text: hours1(hours) + 'h / ' + capacity + 'h - NEAR FULL' };
+        return { cls: 'text-green-400', text: hours1(hours) + 'h / ' + capacity + 'h' };
+    }
+    function capacityIndicator(name, cache) {
+        if (!name) return '<span class="text-xs text-dark-muted">unassigned</span>';
+        const c = (cache || capacityByCarpenter())[name];
+        if (!c) return '<span class="text-xs text-dark-muted">' + escapeHtml(name) + ' - no load</span>';
+        const b = capacityBand(c.hours, c.capacity);
+        return '<span class="text-xs ' + b.cls + '">' + escapeHtml(name + ' ' + b.text) + '</span>';
+    }
+
+    function renderProduction() {
+        const board = document.getElementById('productionBoard');
+        if (!board) return;
+        const filterEl = document.getElementById('prodCarpenterFilter');
+        const selected = filterEl ? filterEl.value : '';
+        const rows = productionRows();
+        if (filterEl) {
+            const names = Array.from(new Set(rows.map(r => r.item.assignedCarpenter).filter(Boolean))).sort();
+            filterEl.innerHTML = '<option value="">All carpenters</option>' + names.map(n =>
+                '<option value="' + escapeHtml(n) + '"' + (n === selected ? ' selected' : '') + '>' + escapeHtml(n) + '</option>').join('');
+        }
+        const visible = (selected ? rows.filter(r => r.item.assignedCarpenter === selected) : rows)
+            .filter(r => !r.item.is_quarantined && nextStageIndex(r.item) < PRODUCTION_STAGES.length);
+        if (!visible.length) {
+            board.innerHTML = emptyState('The floor is clear',
+                'No active work orders on the floor. Approve a quote, attach a BOM and generate a work order to start production.');
+            return;
+        }
+        const capCache = capacityByCarpenter();
+        board.innerHTML = visible.map(r => workOrderCard(r, capCache)).join('');
+    }
+
+    function workOrderCard(row, capCache) {
+        const item = row.item;
+        const pct = itemProgress(item);
+        const idx = nextStageIndex(item);
+        const st = stageDef(idx);
+        const missing = st ? stageGateMissing(item, idx) : [];
+        const blockNext = missing.length > 0 && idx > 0 && departmentOfStage(idx) !== departmentOfStage(idx - 1);
+        const deadline = item.deadline || row.order.DueDate || '';
+        return '<div class="bg-dark-surface rounded-lg border border-dark p-4 flex flex-col gap-3">' +
+            '<div>' +
+            '<p class="font-semibold text-sm">' + escapeHtml(item.description || '(item)') + '</p>' +
+            '<p class="text-xs text-dark-muted">' + escapeHtml(item.projectCode || row.order.Reference || '') +
+            ' - Qty ' + escapeHtml(String(item.qty)) + '</p>' +
+            '</div>' +
+            '<div class="text-xs text-dark-muted">' + escapeHtml(row.order.Reference || '') +
+            ' | Current: <span class="text-slate-100">' + escapeHtml(itemStageLabel(item)) + '</span>' +
+            (deadline ? ' | Due: ' + escapeHtml(String(deadline).slice(0, 10)) : '') + '</div>' +
+            '<div>' + progressBar(pct) + '<p class="text-[11px] text-dark-muted mt-1">' + pct + '% routed</p></div>' +
+            '<div class="text-xs">' + capacityIndicator(item.assignedCarpenter, capCache) + '</div>' +
+            (blockNext ? '<p class="text-[11px] text-red-400">QC gate: ' + escapeHtml(missing.join(', ')) + ' must pass before ' + escapeHtml(departmentOfStage(idx)) + '</p>' : '') +
+            '<div class="flex flex-wrap gap-2 mt-auto">' +
+            '<button class="btn-primary text-xs py-2 px-3 rounded-md" data-action="assign-carpenter" data-key="' + row.orderKey + '" data-index="' + row.index + '">Assign</button>' +
+            '<button class="btn-success text-xs py-2 px-3 rounded-md" data-action="advance-stage" data-key="' + row.orderKey + '" data-index="' + row.index + '"' + (blockNext ? ' disabled' : '') + '>Advance Stage</button>' +
+            '<button class="btn-danger text-xs py-2 px-3 rounded-md" data-action="report-defect" data-key="' + row.orderKey + '" data-index="' + row.index + '">Report Defect</button>' +
+            '</div></div>';
+    }
+
+    async function persistAndReload(orderKey, ps) {
+        ps.updatedAt = new Date().toISOString();
+        ps.version = (ps.version || 0) + 1;
+        const fresh = assertOk(await apiGetOne('/api4/sales-order', orderKey));
+        cfSet(fresh, 'Production State', stringifyCustomJson(ps));
+        assertOk(await apiPut('/api4/sales-order', { key: orderKey, value: fresh }));
+        await KEEL.initLoadData({});
+    }
+
+    function assignCarpenter(orderKey, index) {
+        if (!requirePermission('assign_carpenter')) return;
+        const row = resolveRow(orderKey, index);
+        if (!row) { toast('Work order not found', 'error'); return; }
+        const cap = capacityByCarpenter();
+        const html =
+            '<label class="block text-xs text-dark-muted mb-1">Carpenter / Craftsman</label>' +
+            '<input id="assign-name" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm" value="' + escapeHtml(row.item.assignedCarpenter || '') + '">' +
+            '<p class="text-[11px] text-dark-muted mt-2">Current load: ' + escapeHtml(capacityIndicator(row.item.assignedCarpenter, cap).replace(/<[^>]+>/g, '')) + '</p>' +
+            Object.keys(cap).sort().map(n => {
+                const b = capacityBand(cap[n].hours, cap[n].capacity);
+                return '<p class="text-[11px] ' + b.cls + '">' + escapeHtml(n + ': ' + b.text) + '</p>';
+            }).join('');
+        openModal('Assign Carpenter - ' + (row.item.description || ''), html, async () => {
+            const name = fieldVal('assign-name').trim();
+            row.item.assignedCarpenter = name || null;
+            const roster = (row.ps.assignedCarpenters || []).concat(name ? [name] : []);
+            row.ps.assignedCarpenters = Array.from(new Set(roster.filter(Boolean)));
+            await persistAndReload(orderKey, row.ps);
+            toast(name ? 'Assigned to ' + name : 'Assignment cleared', 'success');
+        });
+    }
+
+    function advanceStage(orderKey, index) {
+        if (!requirePermission('advance_stage')) return;
+        const row = resolveRow(orderKey, index);
+        if (!row || row.item.is_quarantined) { toast('Item is quarantined or missing', 'error'); return; }
+        if (nextStageIndex(row.item) >= PRODUCTION_STAGES.length) { toast('All stages complete', 'info'); return; }
+        const idx = nextStageIndex(row.item);
+        const st = PRODUCTION_STAGES[idx];
+        const missing = stageGateMissing(row.item, idx);
+        const isNewDept = idx > 0 && departmentOfStage(idx) !== departmentOfStage(idx - 1);
+        if (isNewDept && missing.length) {
+            toast('QC gate: ' + missing.join(', ') + ' QC must pass before ' + st.dept, 'error');
+            return;
+        }
+        if (isOutsourcedStageNo(st.no)) {
+            const gp = gatePassOf(row.item);
+            if (gp && gp.status === GATE_OUTBOUND) {
+                toast('Item is out at ' + (gp.vendor_name || 'vendor') + ' - log the inward pass before advancing', 'error');
+                return;
+            }
+        }
+        const deptStages = StageCategories[st.dept];
+        const lastOfDept = deptStages[deptStages.length - 1] === st.no;
+        const html =
+            '<p class="text-sm">Completing: <span class="font-semibold">' + escapeHtml(st.dept + ' - ' + st.name) + '</span> (stage ' + st.no + ' of ' + PRODUCTION_STAGES.length + ')</p>' +
+            (lastOfDept
+                ? '<label class="block text-xs text-dark-muted mb-1 mt-3">' + escapeHtml(st.dept) + ' QC inspection</label>' +
+                  '<select id="qc-result" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' +
+                  '<option value="passed">Passed</option><option value="failed">Failed</option></select>' +
+                  '<label class="block text-xs text-dark-muted mb-1 mt-2">Inspector</label>' +
+                  '<input id="qc-inspector" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' +
+                  '<label class="block text-xs text-dark-muted mb-1 mt-2">Photo evidence URL</label>' +
+                  '<input id="qc-photo" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">'
+                : '<p class="text-xs text-dark-muted mt-2">Confirm this stage is complete.</p>');
+        openModal('Advance Stage - ' + (row.item.description || ''), html, async () => {
+            const result = lastOfDept ? (fieldVal('qc-result') || QC_PASSED) : null;
+            if (lastOfDept && result === QC_FAILED) {
+                row.item.departmentQc = row.item.departmentQc || {};
+                row.item.departmentQc[st.dept] = QC_FAILED;
+                row.ps.qcLogs = row.ps.qcLogs || [];
+                row.ps.qcLogs.push({ dept: st.dept, stage: st.no, result: QC_FAILED, inspector: fieldVal('qc-inspector'), photoUrl: fieldVal('qc-photo'), at: new Date().toISOString() });
+                quarantineItem(row.item, { description: 'QC failed at ' + st.dept + ' - ' + st.name, photoUrl: fieldVal('qc-photo') }, row.ps);
+                await persistAndReload(orderKey, row.ps);
+                toast('QC failed - item sent to quarantine', 'error');
+                return;
+            }
+            row.item.completedStages = row.item.completedStages || [];
+            row.item.completedStages.push(st.no);
+            if (row.ps.stages && row.ps.stages[st.no - 1]) row.ps.stages[st.no - 1].status = 'completed';
+            if (!row.ps.productionStartDate) row.ps.productionStartDate = new Date().toISOString();
+            row.ps.stageLog = row.ps.stageLog || [];
+            row.ps.stageLog.push({
+                stage: st.no, dept: st.dept, name: st.name, result: result,
+                item: row.item.description || '', at: new Date().toISOString(), by: currentRole()
+            });
+            if (lastOfDept) {
+                row.item.departmentQc = row.item.departmentQc || {};
+                row.item.departmentQc[st.dept] = result;
+                row.ps.qcLogs = row.ps.qcLogs || [];
+                row.ps.qcLogs.push({ dept: st.dept, stage: st.no, result: result, inspector: fieldVal('qc-inspector'), photoUrl: fieldVal('qc-photo'), at: new Date().toISOString() });
+            }
+            const done = nextStageIndex(row.item) >= PRODUCTION_STAGES.length;
+            row.ps.status = done ? 'completed' : 'in_progress';
+            row.ps.currentStage = itemStageLabel(row.item);
+            if (done && !row.ps.productionEndDate) row.ps.productionEndDate = new Date().toISOString();
+            await persistAndReload(orderKey, row.ps);
+            toast('Stage advanced: ' + st.name + (result ? ' (QC ' + result + ')' : ''), 'success');
+        });
+    }
+
+    function quarantineItem(item, defect, ps) {
+        item.is_quarantined = true;
+        item.defect = Object.assign({
+            stage: itemStageLabel(item),
+            reportedBy: currentRole(),
+            reportedAt: new Date().toISOString()
+        }, defect || {});
+        ps.status = 'qc_quarantine';
+        ps.priority = 'high';
+        ps.reworkHistory = ps.reworkHistory || [];
+        ps.reworkHistory.push(item.defect);
+    }
+
+    function reportDefect(orderKey, index) {
+        if (!requirePermission('report_defect')) return;
+        const row = resolveRow(orderKey, index);
+        if (!row) { toast('Work order not found', 'error'); return; }
+        const html =
+            '<label class="block text-xs text-dark-muted mb-1">Defect description</label>' +
+            '<textarea id="defect-desc" rows="3" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></textarea>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Rework instructions</label>' +
+            '<textarea id="defect-rework" rows="3" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></textarea>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Photo evidence URL</label>' +
+            '<input id="defect-photo" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">';
+        openModal('Report Defect / Quarantine - ' + (row.item.description || ''), html, async () => {
+            const desc = fieldVal('defect-desc').trim();
+            if (!desc) { throw new Error('Defect description is required'); }
+            quarantineItem(row.item, {
+                description: desc,
+                reworkInstructions: fieldVal('defect-rework').trim(),
+                photoUrl: fieldVal('defect-photo').trim()
+            }, row.ps);
+            await persistAndReload(orderKey, row.ps);
+            toast('Item quarantined - Production Manager alerted', 'error');
+        });
+    }
+
+    function renderQc() {
+        const host = document.getElementById('qcContent');
+        if (!host) return;
+        const rows = productionRows().filter(r => r.item.is_quarantined);
+        if (!rows.length) {
+            host.innerHTML = emptyState('Nothing in quarantine',
+                'Items that fail department QC or an inward IQC check land here for rework before the floor can continue.');
+            return;
+        }
+        const body = rows.map(r => {
+            const d = r.item.defect || {};
+            return '<tr class="border-t border-dark align-top">' +
+                '<td class="p-2">' + escapeHtml(r.order.Reference || '') + '</td>' +
+                '<td class="p-2 font-medium">' + escapeHtml(r.item.description || '') + '</td>' +
+                '<td class="p-2">' + escapeHtml(itemStageLabel(r.item)) + '</td>' +
+                '<td class="p-2">' + escapeHtml(d.description || '') +
+                (d.reworkInstructions ? '<p class="text-xs text-dark-muted">Rework: ' + escapeHtml(d.reworkInstructions) + '</p>' : '') +
+                (d.photoUrl ? '<a class="text-xs text-blue-400 underline" href="' + escapeHtml(d.photoUrl) + '" target="_blank" rel="noopener">Photo evidence</a>' : '') + '</td>' +
+                '<td class="p-2 text-xs text-dark-muted">' + escapeHtml(d.reportedBy || '') + '</td>' +
+                '<td class="p-2 text-right whitespace-nowrap"><button class="btn-primary text-xs py-2 px-3 rounded-md" data-action="release-quarantine" data-key="' + r.orderKey + '" data-index="' + r.index + '">Release from Quarantine</button></td>' +
+                '</tr>';
+        }).join('');
+        host.innerHTML = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+            '<th class="text-left p-2">Order</th><th class="text-left p-2">Item</th><th class="text-left p-2">Stage</th>' +
+            '<th class="text-left p-2">Defect</th><th class="text-left p-2">Reported by</th><th class="p-2"></th>' +
+            '</tr></thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function releaseQuarantine(orderKey, index) {
+        if (!requirePermission('release_quarantine')) return;
+        const row = resolveRow(orderKey, index);
+        if (!row) { toast('Work order not found', 'error'); return; }
+        const html =
+            '<p class="text-sm">Release <span class="font-semibold">' + escapeHtml(row.item.description || '') + '</span> back to the floor.</p>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Release note / QC outcome</label>' +
+            '<input id="release-note" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Reworked by</label>' +
+            '<input id="release-by" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">';
+        openModal('Release from Quarantine', html, async () => {
+            const defect = row.item.defect || {};
+            row.ps.qcLogs = row.ps.qcLogs || [];
+            row.ps.qcLogs.push({ dept: departmentOfStage(nextStageIndex(row.item)), result: 'released', note: fieldVal('release-note'), releasedBy: fieldVal('release-by') || currentRole(), at: new Date().toISOString() });
+            row.ps.reworkHistory = row.ps.reworkHistory || [];
+            row.ps.reworkHistory.push({ resolvedAt: new Date().toISOString(), note: fieldVal('release-note'), defect: defect.description || null });
+            row.item.is_quarantined = false;
+            row.item.defect = null;
+            if (row.ps.status === 'qc_quarantine') row.ps.status = 'in_progress';
+            row.ps.priority = 'normal';
+            await persistAndReload(orderKey, row.ps);
+            toast('Item released from quarantine', 'success');
+        });
+    }
+
+    function renderCapacity() {
+        const host = document.getElementById('capacityContent');
+        if (!host) return;
+        const cap = capacityByCarpenter();
+        const names = Object.keys(cap).sort();
+        const rows = productionRows();
+        const unassigned = rows.filter(r => !r.item.assignedCarpenter).length;
+        if (!names.length && !rows.length) {
+            host.innerHTML = emptyState('No capacity data yet',
+                'Assign carpenters to routed items to see committed hours, NEAR FULL and OVERLOAD WARNING bands here.');
+            return;
+        }
+        const head = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+            '<th class="text-left p-2">Carpenter</th><th class="text-left p-2">Items</th>' +
+            '<th class="text-left p-2">Committed</th><th class="text-left p-2">Status</th></tr></thead><tbody>';
+        const body = names.length ? names.map(n => {
+            const b = capacityBand(cap[n].hours, cap[n].capacity);
+            return '<tr class="border-t border-dark"><td class="p-2 font-medium">' + escapeHtml(n) + '</td>' +
+                '<td class="p-2">' + cap[n].items + '</td>' +
+                '<td class="p-2">' + hours1(cap[n].hours) + 'h / ' + cap[n].capacity + 'h</td>' +
+                '<td class="p-2 ' + b.cls + '">' + escapeHtml(b.text) + '</td></tr>';
+        }).join('') : '<tr><td class="p-2 text-dark-muted" colspan="4">No carpenter assignments yet.</td></tr>';
+        host.innerHTML = head + body + '</tbody></table>' +
+            '<p class="text-xs text-dark-muted mt-3">' + rows.length + ' routed items, ' + unassigned + ' unassigned.</p>';
+    }
+
+    // =========================================================================
+    // Materials - dimensional wood plank register (Phase 4)
+    // =========================================================================
+    function isWoodItem(it) {
+        const s = ((it.itemName || it.Name || '') + ' ' + (it.itemCode || it.Code || '')).toLowerCase();
+        return WOOD_KEYWORDS.some(k => s.indexOf(k) !== -1);
+    }
+    function woodItems() {
+        const all = KEEL.data.inventoryItems || [];
+        const wood = all.filter(isWoodItem);
+        return wood.length ? wood : all;
+    }
+    function inventoryItemLabel(it) {
+        return (it.itemName || it.Name || '(item)') + ' (' + (it.itemCode || it.Code || '') + ')';
+    }
+    function plankRegisterOf(item) {
+        const parsed = parseCustomJson(cfGet(item, SUBLEDGER_FIELD));
+        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.planks)) return createEmptyPlankRegister();
+        return parsed;
+    }
+    function plankStats(reg) {
+        const planks = (reg && reg.planks) || [];
+        let available = 0, reserved = 0, cft = 0;
+        planks.forEach(p => {
+            cft += Number(p.cft) || 0;
+            if (p.status === PLANK_RESERVED) reserved++; else available++;
+        });
+        return { total: planks.length, available: available, reserved: reserved, cft: num2(cft) };
+    }
+    function nextPlankId(reg) {
+        let max = 0;
+        ((reg && reg.planks) || []).forEach(p => {
+            const m = String(p.id || '').match(/(\d{1,4})$/);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        const seed = Math.max(max, Date.now() % 10000);
+        KEEL.plankSeq = Math.max(KEEL.plankSeq || 0, seed) + 1;
+        return PLANK_PREFIX + pad4(KEEL.plankSeq);
+    }
+    function checkedValues(selector) {
+        const nodes = document.querySelectorAll ? document.querySelectorAll(selector) : [];
+        return Array.prototype.slice.call(nodes).filter(n => n.checked).map(n => n.value);
+    }
+    async function loadFullItem(key) {
+        if (KEEL.fullItems[key]) return KEEL.fullItems[key];
+        const full = assertOk(await apiGetOne('/api4/inventory-item', key));
+        if (full && !full.key && !full.Key) full.key = key;
+        KEEL.fullItems[key] = full;
+        return full;
+    }
+
+    async function renderMaterials() {
+        const sel = document.getElementById('plankItemSelect');
+        const host = document.getElementById('plankRegister');
+        if (!sel || !host) return;
+        const items = woodItems();
+        if (!items.length) {
+            sel.innerHTML = '';
+            host.innerHTML = emptyState('No inventory items',
+                'Load inventory items from Manager.io to maintain the dimensional wood plank register here.');
+            return;
+        }
+        const keys = items.map(i => i.key || i.Key);
+        if (!KEEL.selectedPlankItem || keys.indexOf(KEEL.selectedPlankItem) === -1) {
+            KEEL.selectedPlankItem = keys[0];
+        }
+        sel.innerHTML = items.map(i => {
+            const k = i.key || i.Key;
+            return '<option value="' + escapeHtml(k) + '"' + (k === KEEL.selectedPlankItem ? ' selected' : '') + '>' +
+                escapeHtml(inventoryItemLabel(i)) + '</option>';
+        }).join('');
+        host.innerHTML = '<p class="text-dark-muted text-sm p-4">Loading plank register...</p>';
+        try {
+            const full = await loadFullItem(KEEL.selectedPlankItem);
+            renderPlankTable(full, host);
+        } catch (err) {
+            host.innerHTML = '<p class="text-red-400 text-sm p-4">' + escapeHtml(friendlyError(err)) + '</p>';
+            toastApiError(err);
+        }
+    }
+
+    function renderPlankTable(full, host) {
+        if (!full) {
+            host.innerHTML = '<p class="text-dark-muted text-sm p-4">No register data.</p>';
+            return;
+        }
+        const reg = plankRegisterOf(full);
+        const stats = plankStats(reg);
+        const planks = reg.planks || [];
+        let table;
+        if (!planks.length) {
+            table = emptyState('No planks registered for this item',
+                'Use Receive Planks to add dimensional stock. Each plank gets an LHR-26-xxxx id with length, width, thickness and CFT volume.');
+        } else {
+            const body = planks.map(p => {
+                const reserved = p.status === PLANK_RESERVED;
+                return '<tr class="border-t border-dark">' +
+                    '<td class="p-2 font-medium">' + escapeHtml(p.id || '') + '</td>' +
+                    '<td class="p-2">' + num2(p.l) + '</td>' +
+                    '<td class="p-2">' + num2(p.w) + '</td>' +
+                    '<td class="p-2">' + num2(p.t) + '</td>' +
+                    '<td class="p-2">' + num2(p.cft) + '</td>' +
+                    '<td class="p-2 ' + (reserved ? 'text-amber-400' : 'text-green-400') + '">' + escapeHtml(p.status || PLANK_AVAILABLE) + '</td>' +
+                    '<td class="p-2 text-dark-muted">' + escapeHtml(p.order_reference || '') + '</td>' +
+                    '</tr>';
+            }).join('');
+            table = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+                '<th class="text-left p-2">Plank ID</th><th class="text-left p-2">L (in)</th><th class="text-left p-2">W (in)</th>' +
+                '<th class="text-left p-2">T (in)</th><th class="text-left p-2">CFT</th><th class="text-left p-2">Status</th>' +
+                '<th class="text-left p-2">Reserved For</th></tr></thead><tbody>' + body + '</tbody></table>';
+        }
+        host.innerHTML = '<div class="flex flex-wrap gap-4 mb-3 text-xs text-dark-muted">' +
+            '<span>Item: <span class="text-slate-100">' + escapeHtml(full.ItemName || full.itemName || '') + '</span></span>' +
+            '<span>Total: <span class="text-slate-100">' + stats.total + '</span></span>' +
+            '<span>Available: <span class="text-green-400">' + stats.available + '</span></span>' +
+            '<span>Reserved: <span class="text-amber-400">' + stats.reserved + '</span></span>' +
+            '<span>Register CFT: <span class="text-slate-100">' + stats.cft + '</span></span></div>' + table;
+    }
+
+    function receivePlanks(btn) {
+        if (!requirePermission('receive_planks')) return;
+        const items = woodItems();
+        if (!items.length) { toast('No inventory items available', 'error'); return; }
+        const options = items.map(i => {
+            const k = i.key || i.Key;
+            return '<option value="' + escapeHtml(k) + '"' + (k === KEEL.selectedPlankItem ? ' selected' : '') + '>' + escapeHtml(inventoryItemLabel(i)) + '</option>';
+        }).join('');
+        const html =
+            '<label class="block text-xs text-dark-muted mb-1">Wood item</label>' +
+            '<select id="plank-item" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' + options + '</select>' +
+            '<div class="grid grid-cols-3 gap-2 mt-2">' +
+            '<div><label class="block text-xs text-dark-muted mb-1">Length (in)</label><input id="plank-l" type="number" min="0" step="0.01" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></div>' +
+            '<div><label class="block text-xs text-dark-muted mb-1">Width (in)</label><input id="plank-w" type="number" min="0" step="0.01" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></div>' +
+            '<div><label class="block text-xs text-dark-muted mb-1">Thickness (in)</label><input id="plank-t" type="number" min="0" step="0.01" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></div>' +
+            '</div>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Number of identical planks</label>' +
+            '<input id="plank-qty" type="number" min="1" step="1" value="1" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">';
+        openModal('Receive Planks', html, async () => {
+            const itemKey = fieldVal('plank-item');
+            const l = Number(fieldVal('plank-l'));
+            const w = Number(fieldVal('plank-w'));
+            const t = Number(fieldVal('plank-t'));
+            const qty = Math.floor(Number(fieldVal('plank-qty')));
+            if (!itemKey) throw new Error('Select a wood item');
+            if (!(l > 0) || !(w > 0) || !(t > 0)) throw new Error('Length, width and thickness must be positive');
+            if (!(qty >= 1)) throw new Error('Quantity must be at least 1');
+            await KEEL.ensureSubledgerField();
+            const fresh = assertOk(await apiGetOne('/api4/inventory-item', itemKey));
+            const reg = plankRegisterOf(fresh);
+            const cft = plankCft(l, w, t);
+            for (let i = 0; i < qty; i++) {
+                reg.planks.push({
+                    id: nextPlankId(reg), l: num2(l), w: num2(w), t: num2(t), cft: cft,
+                    status: PLANK_AVAILABLE, order_reference: null,
+                    receivedBy: currentRole(), receivedAt: new Date().toISOString()
+                });
+            }
+            cfSet(fresh, SUBLEDGER_FIELD, stringifyCustomJson(reg));
+            assertOk(await apiPut('/api4/inventory-item', { key: itemKey, value: fresh }));
+            KEEL.fullItems[itemKey] = fresh;
+            KEEL.selectedPlankItem = itemKey;
+            toast(qty + ' plank(s) received (' + cft + ' CFT each).', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    function issuePlanks(btn) {
+        if (!requirePermission('issue_planks')) return;
+        const itemKey = KEEL.selectedPlankItem;
+        const full = itemKey ? KEEL.fullItems[itemKey] : null;
+        if (!full) { toast('Select a wood item first', 'error'); return; }
+        const reg = plankRegisterOf(full);
+        const available = (reg.planks || []).filter(p => p.status !== PLANK_RESERVED);
+        if (!available.length) { toast('No available planks for reservation', 'error'); return; }
+        const orders = activeWorkOrders();
+        const orderOptions = orders.map(o => {
+            const ref = o.Reference || o.MasterReference || (o.key || o.Key);
+            return '<option value="' + escapeHtml(ref) + '">' + escapeHtml(ref) + '</option>';
+        }).join('');
+        const rows = available.map(p =>
+            '<label class="flex items-center gap-2 text-xs border-t border-dark py-1">' +
+            '<input type="checkbox" class="plank-pick" value="' + escapeHtml(p.id) + '">' +
+            '<span class="font-medium">' + escapeHtml(p.id) + '</span>' +
+            '<span class="text-dark-muted">' + num2(p.l) + ' x ' + num2(p.w) + ' x ' + num2(p.t) + ' in, ' + num2(p.cft) + ' CFT</span>' +
+            '</label>').join('');
+        const html =
+            '<label class="block text-xs text-dark-muted mb-1">Work Order</label>' +
+            (orderOptions
+                ? '<select id="plank-order" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' + orderOptions + '</select>'
+                : '<input id="plank-order" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm" placeholder="Work order reference">') +
+            '<p class="block text-xs text-dark-muted mb-1 mt-3">Available planks</p>' +
+            '<div class="max-h-48 overflow-auto border border-dark rounded-md p-2">' + rows + '</div>';
+        openModal('Issue / Reserve Planks - ' + (full.ItemName || full.itemName || ''), html, async () => {
+            const orderRef = fieldVal('plank-order').trim();
+            if (!orderRef) throw new Error('Select or enter a work order');
+            const picks = checkedValues('.plank-pick:checked');
+            if (!picks.length) throw new Error('Select at least one plank');
+            await KEEL.ensureSubledgerField();
+            const fresh = assertOk(await apiGetOne('/api4/inventory-item', itemKey));
+            const freshReg = plankRegisterOf(fresh);
+            let n = 0;
+            freshReg.planks.forEach(p => {
+                if (picks.indexOf(p.id) !== -1) {
+                    p.status = PLANK_RESERVED;
+                    p.order_reference = orderRef;
+                    p.reservedBy = currentRole();
+                    p.reservedAt = new Date().toISOString();
+                    n++;
+                }
+            });
+            cfSet(fresh, SUBLEDGER_FIELD, stringifyCustomJson(freshReg));
+            assertOk(await apiPut('/api4/inventory-item', { key: itemKey, value: fresh }));
+            KEEL.fullItems[itemKey] = fresh;
+            toast(n + ' plank(s) reserved for ' + orderRef, 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    // =========================================================================
+    // Procurement - purchase requisitions & purchase orders (Phase 4)
+    // =========================================================================
+    function poReference(po) { return po.Reference || po.reference || ''; }
+    function isPR(po) { return /^PR-/i.test(poReference(po)); }
+    function procurementSplit() {
+        const all = KEEL.data.purchaseOrders || [];
+        return { drafts: all.filter(isPR), approved: all.filter(p => !isPR(p)) };
+    }
+    function poTotal(po) {
+        const lines = po.Lines || po.lines || [];
+        let sum = 0;
+        lines.forEach(l => {
+            const qty = Number(l.Qty !== undefined ? l.Qty : l.qty) || 0;
+            const price = Number(l.PurchaseUnitPrice !== undefined ? l.PurchaseUnitPrice : l.purchaseUnitPrice) || 0;
+            sum += qty * price;
+        });
+        return num2(sum);
+    }
+    function poLineSummary(po) {
+        const lines = po.Lines || po.lines || [];
+        return lines.length ? lines.length + ' line(s)' : 'no lines';
+    }
+    // Build a camelCase write payload (APIv4/OpenAPI) from a read record.
+    function poLineToWrite(l) {
+        return {
+            item: l.Item !== undefined ? l.Item : (l.item !== undefined ? l.item : null),
+            lineDescription: l.LineDescription !== undefined ? l.LineDescription : (l.lineDescription || null),
+            qty: Number(l.Qty !== undefined ? l.Qty : l.qty) || 0,
+            purchaseUnitPrice: Number(l.PurchaseUnitPrice !== undefined ? l.PurchaseUnitPrice : l.purchaseUnitPrice) || 0
+        };
+    }
+    function poToWritePayload(po) {
+        const lines = (po.Lines || po.lines || []).map(poLineToWrite);
+        const cf = (po.CustomFields2 && po.CustomFields2.Strings) || (po.customFields2 && po.customFields2.strings) || {};
+        return {
+            date: po.Date || po.date || new Date().toISOString(),
+            reference: po.Reference || po.reference || null,
+            supplier: po.Supplier || po.supplier || null,
+            description: po.Description || po.description || null,
+            lines: lines,
+            customFields2: { strings: cf }
+        };
+    }
+    function nextPRRef() {
+        const year = new Date().getFullYear();
+        let max = 0;
+        (KEEL.data.purchaseOrders || []).forEach(p => {
+            const m = poReference(p).match(/^PR-\d+-(\d+)/i);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return PR_PREFIX + year + '-' + pad3(max + 1);
+    }
+    function nextPORef() {
+        const year = new Date().getFullYear();
+        let max = 0;
+        (KEEL.data.purchaseOrders || []).forEach(p => {
+            const m = poReference(p).match(/^PO-\d+-(\d+)/i);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return PO_PREFIX + year + '-' + pad3(max + 1);
+    }
+
+    function renderProcurement() {
+        const prHost = document.getElementById('prList');
+        const poHost = document.getElementById('poList');
+        if (!prHost || !poHost) return;
+        const split = procurementSplit();
+        prHost.innerHTML = procurementTable(split.drafts, true);
+        poHost.innerHTML = procurementTable(split.approved, false);
+    }
+    function procurementTable(list, isDraft) {
+        if (!list.length) return emptyState(
+            isDraft ? 'No draft requisitions' : 'No issued purchase orders',
+            isDraft
+                ? 'Generate a purchase requisition to start the buying workflow. Draft PRs sit here until Procurement approves them.'
+                : 'Approving a draft PR issues the purchase order to the supplier and moves it into this list.');
+        const body = list.map(po => {
+            const key = po.key || po.Key;
+            const action = isDraft
+                ? '<td class="p-2 text-right whitespace-nowrap"><button class="btn-success text-xs py-1 px-3 rounded-md" data-action="approve-pr" data-key="' + key + '">Approve PR -&gt; Issue PO</button></td>'
+                : '<td class="p-2 text-right text-xs text-green-400">Issued</td>';
+            return '<tr class="border-t border-dark align-top">' +
+                '<td class="p-2 font-medium">' + escapeHtml(poReference(po)) + '</td>' +
+                '<td class="p-2">' + escapeHtml(KEEL.supplierName(po.Supplier || po.supplier)) + '</td>' +
+                '<td class="p-2 text-dark-muted">' + escapeHtml(poLineSummary(po)) + '</td>' +
+                '<td class="p-2">' + num2(poTotal(po)) + '</td>' +
+                action + '</tr>';
+        }).join('');
+        return '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+            '<th class="text-left p-2">Reference</th><th class="text-left p-2">Supplier</th>' +
+            '<th class="text-left p-2">Lines</th><th class="text-left p-2">Amount</th><th class="p-2"></th>' +
+            '</tr></thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function generatePR(btn) {
+        if (!requirePermission('generate_pr')) return;
+        const suppliers = KEEL.data.suppliers || [];
+        const items = KEEL.data.inventoryItems || [];
+        if (!suppliers.length) { toast('No suppliers available', 'error'); return; }
+        const supplierOptions = suppliers.map(s => {
+            const k = s.key || s.Key;
+            const label = (s.name || s.Name || '') + (s.code || s.Code ? ' (' + (s.code || s.Code) + ')' : '');
+            return '<option value="' + escapeHtml(k) + '">' + escapeHtml(label) + '</option>';
+        }).join('');
+        const itemOptions = items.map(i => '<option value="' + escapeHtml(i.key || i.Key) + '">' + escapeHtml(inventoryItemLabel(i)) + '</option>').join('');
+        const html =
+            '<label class="block text-xs text-dark-muted mb-1">Supplier</label>' +
+            '<select id="pr-supplier" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' + supplierOptions + '</select>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Item</label>' +
+            '<select id="pr-item" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' + itemOptions + '</select>' +
+            '<div class="grid grid-cols-2 gap-2 mt-2">' +
+            '<div><label class="block text-xs text-dark-muted mb-1">Qty</label><input id="pr-qty" type="number" min="1" step="1" value="1" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></div>' +
+            '<div><label class="block text-xs text-dark-muted mb-1">Unit price</label><input id="pr-price" type="number" min="0" step="0.01" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm"></div>' +
+            '</div>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Description</label>' +
+            '<input id="pr-desc" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">';
+        openModal('Generate Purchase Requisition', html, async () => {
+            const supplierKey = fieldVal('pr-supplier');
+            const itemKey = fieldVal('pr-item');
+            const qty = Number(fieldVal('pr-qty'));
+            const price = Number(fieldVal('pr-price'));
+            const desc = fieldVal('pr-desc').trim();
+            if (!supplierKey) throw new Error('Select a supplier');
+            if (!(qty > 0)) throw new Error('Quantity must be positive');
+            const ref = nextPRRef();
+            const po = {
+                date: new Date().toISOString(),
+                reference: ref,
+                supplier: supplierKey,
+                description: desc,
+                lines: [{
+                    item: itemKey || null,
+                    lineDescription: desc,
+                    qty: qty,
+                    purchaseUnitPrice: isFinite(price) ? price : 0
+                }],
+                customFields2: { strings: {} }
+            };
+            assertOk(await apiPost('/api4/purchase-order', { value: po }));
+            toast('Purchase Requisition ' + ref + ' created (Draft).', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    function approvePR(key, btn) {
+        if (!requirePermission('approve_pr')) return;
+        const po = (KEEL.data.purchaseOrders || []).find(p => (p.key || p.Key) === key);
+        if (!po) { toast('Requisition not found', 'error'); return; }
+        const html =
+            '<p class="text-sm">Approve requisition <span class="font-semibold">' + escapeHtml(poReference(po)) + '</span> and issue it as a Purchase Order?</p>' +
+            '<p class="text-xs text-dark-muted mt-2">Supplier: ' + escapeHtml(KEEL.supplierName(po.Supplier || po.supplier)) +
+            ' - ' + escapeHtml(poLineSummary(po)) + ' - Amount ' + num2(poTotal(po)) + '</p>';
+        openModal('Approve PR -> Issue PO', html, async () => {
+            const fresh = assertOk(await apiGetOne('/api4/purchase-order', key));
+            const payload = poToWritePayload(fresh);
+            payload.reference = nextPORef();
+            assertOk(await apiPut('/api4/purchase-order', { key: key, value: payload }));
+            toast('Purchase Order ' + payload.reference + ' issued.', 'success');
+            await KEEL.initLoadData({});
+        });
+    }
+
+    // =========================================================================
+    // Subcontractors, gate passes & vendor volume caps (Phase 5)
+    // =========================================================================
+    function isOutsourcedStageNo(no) { return OUTSOURCED_STAGES.indexOf(no) !== -1; }
+    function outsourcedStageLabel(no) {
+        const s = PRODUCTION_STAGES.find(x => x.no === no);
+        return s ? (s.name + ' (' + s.dept + ')') : ('Stage ' + no);
+    }
+    function gatePassOf(item) { return item && item.gate_pass ? item.gate_pass : null; }
+    // Items whose next unrouted stage is an outsourced (Job-Work) stage.
+    function subcontractorRows() {
+        return productionRows().filter(r => {
+            if (r.item.is_quarantined) return false;
+            const idx = nextStageIndex(r.item);
+            if (idx >= PRODUCTION_STAGES.length) return false;
+            return isOutsourcedStageNo(PRODUCTION_STAGES[idx].no);
+        });
+    }
+    // Sum purchase-order volume per supplier; merge in the outsourced stages
+    // each vendor has been used for (from gate passes).
+    function vendorVolume() {
+        const map = {};
+        function ensure(key) {
+            if (!map[key]) map[key] = { key: key, name: KEEL.supplierName(key), total: 0, count: 0, stages: {} };
+            return map[key];
+        }
+        (KEEL.data.purchaseOrders || []).forEach(po => {
+            const sid = po.Supplier || po.supplier;
+            if (!sid) return;
+            const v = ensure(sid);
+            v.total += poTotal(po);
+            v.count++;
+        });
+        productionRows().forEach(r => {
+            const gp = gatePassOf(r.item);
+            if (!gp || !gp.vendor_id || !gp.stage) return;
+            const v = map[gp.vendor_id] || ensure(gp.vendor_id);
+            if ((!v.name || v.name === '(unknown supplier)') && gp.vendor_name) v.name = gp.vendor_name;
+            v.stages[gp.stage] = true;
+        });
+        return Object.keys(map).map(k => {
+            const v = map[k];
+            return {
+                key: v.key, name: v.name, total: num2(v.total), count: v.count,
+                stageCount: Object.keys(v.stages).length, stages: Object.keys(v.stages).map(Number)
+            };
+        }).sort((a, b) => b.total - a.total);
+    }
+    // Single point of failure: an outsourced stage served by exactly one vendor.
+    function vendorDependencyRisks() {
+        const byStage = {};
+        vendorVolume().forEach(v => v.stages.forEach(no => { (byStage[no] = byStage[no] || []).push(v); }));
+        return Object.keys(byStage).map(Number).sort((a, b) => a - b)
+            .filter(no => byStage[no].length === 1)
+            .map(no => ({ stage: no, vendor: byStage[no][0] }));
+    }
+
+    function renderSubcontractors() {
+        const board = document.getElementById('gatePassBoard');
+        const vendors = document.getElementById('vendorBoard');
+        const risk = document.getElementById('subRisk');
+        if (!board || !vendors || !risk) return;
+
+        const risks = vendorDependencyRisks();
+        risk.innerHTML = risks.length ? risks.map(r =>
+            '<div class="bg-dark-surface border border-red-600 rounded-lg p-3 mb-2">' +
+            '<p class="text-sm text-red-400 font-semibold">Dependency Risk: Source backup vendor.</p>' +
+            '<p class="text-xs text-dark-muted">' + escapeHtml(outsourcedStageLabel(r.stage)) +
+            ' is served by only one vendor: ' + escapeHtml(r.vendor.name) + '.</p></div>').join('') : '';
+
+        const rows = subcontractorRows();
+        if (!rows.length) {
+            board.innerHTML = emptyState('Nothing outsourced right now',
+                'Items appear here while they sit at a Job-Work stage: Metalworks, Lathe Works, Cane/Rattan Weaving or Cord/Carving.');
+        } else {
+            const body = rows.map(r => {
+                const st = PRODUCTION_STAGES[nextStageIndex(r.item)];
+                const gp = gatePassOf(r.item);
+                const status = gp ? gp.status : 'Not sent';
+                const vendor = gp && gp.vendor_id ? (gp.vendor_name || KEEL.supplierName(gp.vendor_id)) : '';
+                const out = gp && gp.out_date ? String(gp.out_date).slice(0, 10) : '';
+                const exp = gp && gp.expected_in ? String(gp.expected_in).slice(0, 10) : '';
+                const iqc = (gp && gp.status === GATE_RETURNED) ? (gp.iqc_passed ? 'IQC Passed' : 'IQC Failed') : '';
+                const actions = (gp && gp.status === GATE_OUTBOUND)
+                    ? '<button class="btn-primary text-xs py-1 px-3 rounded-md" data-action="log-inward" data-key="' + r.orderKey + '" data-index="' + r.index + '">Log Inward Pass &amp; Return IQC</button>'
+                    : '<button class="btn-success text-xs py-1 px-3 rounded-md" data-action="issue-gate-pass" data-key="' + r.orderKey + '" data-index="' + r.index + '">Issue Outward Gate Pass</button>';
+                return '<tr class="border-t border-dark align-top">' +
+                    '<td class="p-2">' + escapeHtml(r.order.Reference || '') + '</td>' +
+                    '<td class="p-2 font-medium">' + escapeHtml(r.item.description || '') + '</td>' +
+                    '<td class="p-2">' + escapeHtml(outsourcedStageLabel(st.no)) + '</td>' +
+                    '<td class="p-2">' + escapeHtml(vendor) + '</td>' +
+                    '<td class="p-2 ' + (status === GATE_OUTBOUND ? 'text-amber-400' : (status === GATE_RETURNED ? 'text-green-400' : 'text-dark-muted')) + '">' + escapeHtml(status) + '</td>' +
+                    '<td class="p-2 text-dark-muted">' + escapeHtml(out) + (exp ? ' -&gt; ' + escapeHtml(exp) : '') +
+                    (iqc ? '<p class="text-xs ' + (gp.iqc_passed ? 'text-green-400' : 'text-red-400') + '">' + escapeHtml(iqc) + '</p>' : '') + '</td>' +
+                    '<td class="p-2 text-right whitespace-nowrap">' + actions + '</td></tr>';
+            }).join('');
+            board.innerHTML = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+                '<th class="text-left p-2">Order</th><th class="text-left p-2">Item</th><th class="text-left p-2">Outsourced Stage</th>' +
+                '<th class="text-left p-2">Vendor</th><th class="text-left p-2">Gate Pass</th><th class="text-left p-2">Dates / IQC</th><th class="p-2"></th>' +
+                '</tr></thead><tbody>' + body + '</tbody></table>';
+        }
+
+        const vol = vendorVolume();
+        if (!vol.length) {
+            vendors.innerHTML = emptyState('No vendor activity yet',
+                'Purchase orders and gate passes will populate vendor volume, tax cap warnings and dependency risk here.');
+        } else {
+            const vbody = vol.map(v => {
+                const over = v.total > TAX_VOLUME_CAP;
+                return '<tr class="border-t border-dark">' +
+                    '<td class="p-2 font-medium">' + escapeHtml(v.name) + '</td>' +
+                    '<td class="p-2">' + v.count + '</td>' +
+                    '<td class="p-2">' + v.stageCount + '</td>' +
+                    '<td class="p-2 ' + (over ? 'text-red-400 font-semibold' : '') + '">' + v.total + '</td>' +
+                    '<td class="p-2">' + (over
+                        ? '<span class="text-xs bg-red-600 text-white rounded px-2 py-1">Volume Cap Warning: Shift work to alternate vendor.</span>'
+                        : '<span class="text-xs text-green-400">Within cap</span>') + '</td>' +
+                    '</tr>';
+            }).join('');
+            vendors.innerHTML = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+                '<th class="text-left p-2">Vendor</th><th class="text-left p-2">POs</th><th class="text-left p-2">Stages</th>' +
+                '<th class="text-left p-2">Total Volume</th><th class="text-left p-2">Cap (' + TAX_VOLUME_CAP + ')</th>' +
+                '</tr></thead><tbody>' + vbody + '</tbody></table>' +
+                '<p class="text-xs text-dark-muted mt-3">Recent purchase-order volume per vendor. Above ' + TAX_VOLUME_CAP + ' PKR suggests shifting volume to alternate vendors.</p>';
+        }
+    }
+
+    function issueGatePass(orderKey, index) {
+        if (!requirePermission('issue_gate_pass')) return;
+        const row = resolveRow(orderKey, index);
+        if (!row) { toast('Work order not found', 'error'); return; }
+        const idx = nextStageIndex(row.item);
+        const st = PRODUCTION_STAGES[idx];
+        if (!st || !isOutsourcedStageNo(st.no)) { toast('Item is not at an outsourced stage', 'error'); return; }
+        const suppliers = KEEL.data.suppliers || [];
+        if (!suppliers.length) { toast('No suppliers available', 'error'); return; }
+        const options = suppliers.map(s => {
+            const k = s.key || s.Key;
+            const label = (s.name || s.Name || '') + (s.code || s.Code ? ' (' + (s.code || s.Code) + ')' : '');
+            return '<option value="' + escapeHtml(k) + '">' + escapeHtml(label) + '</option>';
+        }).join('');
+        const html =
+            '<p class="text-sm">Outsourced stage: <span class="font-semibold">' + escapeHtml(outsourcedStageLabel(st.no)) + '</span></p>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Vendor</label>' +
+            '<select id="gate-vendor" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' + options + '</select>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Expected Return Date</label>' +
+            '<input id="gate-expected" type="date" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">';
+        openModal('Issue Outward Gate Pass - ' + (row.item.description || ''), html, async () => {
+            const vendorId = fieldVal('gate-vendor');
+            if (!vendorId) throw new Error('Select a vendor');
+            const expected = fieldVal('gate-expected');
+            const out = new Date().toISOString();
+            row.item.gate_pass = {
+                stage: st.no,
+                status: GATE_OUTBOUND,
+                vendor_id: vendorId,
+                vendor_name: KEEL.supplierName(vendorId),
+                out_date: out,
+                expected_in: expected || null,
+                in_date: null,
+                iqc_passed: null,
+                issuedBy: currentRole()
+            };
+            row.ps.gatePasses = row.ps.gatePasses || [];
+            row.ps.gatePasses.push({ direction: 'out', stage: st.no, vendor_id: vendorId, at: out, by: currentRole() });
+            await persistAndReload(orderKey, row.ps);
+            toast('Outward gate pass issued to ' + KEEL.supplierName(vendorId) + '.', 'success');
+        });
+    }
+
+    function logInwardPass(orderKey, index) {
+        if (!requirePermission('log_inward')) return;
+        const row = resolveRow(orderKey, index);
+        if (!row) { toast('Work order not found', 'error'); return; }
+        const gp = gatePassOf(row.item);
+        if (!gp || gp.status !== GATE_OUTBOUND) { toast('No active outbound gate pass', 'error'); return; }
+        const html =
+            '<p class="text-sm">Return of item from <span class="font-semibold">' + escapeHtml(gp.vendor_name || KEEL.supplierName(gp.vendor_id)) + '</span>.</p>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-3">Incoming Quality Control (IQC)</label>' +
+            '<select id="iqc-result" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' +
+            '<option value="passed">Passed</option><option value="failed">Failed</option></select>' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Inspector</label>' +
+            '<input id="iqc-inspector" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">' +
+            '<label class="block text-xs text-dark-muted mb-1 mt-2">Notes / photo URL</label>' +
+            '<input id="iqc-notes" class="w-full bg-dark-card border border-dark rounded-md p-2 text-sm">';
+        openModal('Log Inward Pass & Return IQC - ' + (row.item.description || ''), html, async () => {
+            const result = fieldVal('iqc-result') || 'passed';
+            const inspector = fieldVal('iqc-inspector');
+            const notes = fieldVal('iqc-notes');
+            const inDate = new Date().toISOString();
+            row.item.gate_pass = Object.assign({}, gp, {
+                status: GATE_RETURNED,
+                in_date: inDate,
+                iqc_passed: result === 'passed',
+                receivedBy: currentRole()
+            });
+            row.ps.gatePasses = row.ps.gatePasses || [];
+            row.ps.gatePasses.push({ direction: 'in', stage: gp.stage, vendor_id: gp.vendor_id, iqc: result, inspector: inspector, at: inDate, by: currentRole() });
+            row.ps.qcLogs = row.ps.qcLogs || [];
+            row.ps.qcLogs.push({ dept: departmentOfStage(nextStageIndex(row.item)), result: 'iqc_' + result, inspector: inspector, notes: notes, at: inDate });
+            if (result === 'failed') {
+                quarantineItem(row.item, {
+                    description: 'IQC failed on return from ' + (gp.vendor_name || KEEL.supplierName(gp.vendor_id)),
+                    reworkInstructions: notes,
+                    photoUrl: notes
+                }, row.ps);
+                await persistAndReload(orderKey, row.ps);
+                toast('IQC failed - item sent to quarantine', 'error');
+                return;
+            }
+            await persistAndReload(orderKey, row.ps);
+            toast('Inward pass logged - IQC passed.', 'success');
+        });
+    }
+
+    // =========================================================================
+    // Phase 6 - Audit Trail / Project 360
+    // =========================================================================
+    const QC_ACTION_LABELS = {
+        passed: 'QC Passed', failed: 'QC Failed', pending: 'QC Pending',
+        released: 'Quarantine Released', iqc_passed: 'IQC Passed', iqc_failed: 'IQC Failed'
+    };
+    function formatTs(iso) {
+        const d = new Date(iso);
+        if (!iso || isNaN(d.getTime())) return iso ? String(iso) : '-';
+        const p = n => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+            ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
+    // Merge every history array in production_state_json across active sales orders.
+    function auditEntries() {
+        const out = [];
+        activeWorkOrders().forEach(o => {
+            const ps = psOf(o);
+            if (!ps) return;
+            const orderRef = o.Reference || o.reference || '';
+            const projectRef = cfGet(o, 'Master Reference') || ps.workOrderId || orderRef;
+            const fallback = ps.updatedAt || o.Date || o.date || new Date().toISOString();
+            const add = (e) => out.push({
+                ts: e.at || fallback, action: e.action, user: e.user || '-',
+                detail: e.detail || '', project: projectRef || '-', order: orderRef
+            });
+            if (ps.productionStartDate) {
+                add({ at: ps.productionStartDate, action: 'Production Started', user: ps.startedBy || '-',
+                    detail: (ps.items || []).length + ' item(s) routed' });
+            }
+            (ps.stageLog || []).forEach(e => add({
+                at: e.at, action: 'Stage Advanced', user: e.by,
+                detail: e.dept + ' - ' + e.name + (e.item ? ' | ' + e.item : '')
+            }));
+            (ps.qcLogs || []).forEach(e => add({
+                at: e.at, action: QC_ACTION_LABELS[e.result] || ('QC ' + (e.result || '')),
+                user: e.inspector || e.releasedBy || '-',
+                detail: (e.stage ? 'stage ' + e.stage + ' | ' : '') + (e.dept || '') + (e.notes ? ' | ' + e.notes : '')
+            }));
+            (ps.gatePasses || []).forEach(e => add({
+                at: e.at, action: e.direction === 'in' ? 'Inward Pass Logged' : 'Outward Pass Issued',
+                user: e.by,
+                detail: KEEL.supplierName(e.vendor_id) + ' | stage ' + e.stage + (e.iqc ? ' | IQC ' + e.iqc : '')
+            }));
+            (ps.reworkHistory || []).forEach(e => {
+                if (!e) return;
+                if (e.reportedAt) add({ at: e.reportedAt, action: 'Defect Reported', user: e.reportedBy || '-', detail: e.description || '' });
+                else if (e.resolvedAt) add({ at: e.resolvedAt, action: 'Rework Resolved', user: e.releasedBy || '-', detail: e.note || '' });
+            });
+        });
+        out.sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || '')));
+        return out;
+    }
+    function renderAudit() {
+        const host = document.getElementById('auditContent');
+        if (!host) return;
+        if (!auditVisible()) {
+            host.innerHTML = emptyState('Not Authorized', 'The Audit Trail is available to Admin and Sales Manager roles only.');
+            return;
+        }
+        const entries = auditEntries();
+        if (!entries.length) {
+            host.innerHTML = emptyState('No audit history yet',
+                'Stage advances, QC checks, gate passes and defects will appear here as production runs.');
+            return;
+        }
+        const orders = activeWorkOrders().length;
+        const body = entries.map(e => '<tr class="border-t border-dark align-top">' +
+            '<td class="p-2 whitespace-nowrap text-dark-muted">' + escapeHtml(formatTs(e.ts)) + '</td>' +
+            '<td class="p-2 font-medium">' + escapeHtml(e.action) +
+            (e.detail ? '<p class="text-xs text-dark-muted font-normal">' + escapeHtml(e.detail) + '</p>' : '') + '</td>' +
+            '<td class="p-2">' + escapeHtml(e.user) + '</td>' +
+            '<td class="p-2">' + escapeHtml(e.project) + '</td>' +
+            '<td class="p-2 text-dark-muted">' + escapeHtml(e.order) + '</td>' +
+            '</tr>').join('');
+        host.innerHTML = '<table class="w-full text-sm"><thead><tr class="text-dark-muted">' +
+            '<th class="text-left p-2">Timestamp</th><th class="text-left p-2">Action</th>' +
+            '<th class="text-left p-2">Assigned User</th><th class="text-left p-2">Project Reference</th>' +
+            '<th class="text-left p-2">Order</th></tr></thead><tbody>' + body + '</tbody></table>' +
+            '<p class="text-xs text-dark-muted mt-3">' + entries.length + ' audit entries across ' +
+            orders + ' active sales order(s), oldest first.</p>';
+    }
+
+    // =========================================================================
+    // Event wiring
+    // =========================================================================
+    document.addEventListener('click', (e) => {
+        const closer = e.target.closest('[data-modal-close]');
+        if (closer) { closeModal(); return; }
+        const tab = e.target.closest('.crm-tab');
+        if (tab) { crmTab = tab.dataset.tab; renderCRM(); return; }
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const key = btn.dataset.key;
+        const index = parseInt(btn.dataset.index, 10);
+        switch (btn.dataset.action) {
+            case 'convert-lead': convertLead(key, btn); break;
+            case 'revise-quote': reviseQuote(key, btn); break;
+            case 'approve-quote': approveQuote(key, btn); break;
+            case 'confirm-payment': confirmPayment(key, btn); break;
+            case 'attach-bom': attachBom(key, btn); break;
+            case 'ceo-approve': ceoApprove(key, btn); break;
+            case 'advance-stage': advanceStage(key, index); break;
+            case 'report-defect': reportDefect(key, index); break;
+            case 'release-quarantine': releaseQuarantine(key, index); break;
+            case 'assign-carpenter': assignCarpenter(key, index); break;
+            case 'receive-planks': receivePlanks(btn); break;
+            case 'issue-planks': issuePlanks(btn); break;
+            case 'generate-pr': generatePR(btn); break;
+            case 'approve-pr': approvePR(key, btn); break;
+            case 'issue-gate-pass': issueGatePass(key, index); break;
+            case 'log-inward': logInwardPass(key, index); break;
+        }
+    });
+
+    function init() {
+        document.getElementById('loadDataBtn').addEventListener('click', initialLoad);
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            if (!KEEL.loaded) return;
+            try { await KEEL.initLoadData({}); toast('Data refreshed from Manager.io', 'info'); }
+            catch (err) { console.error(err); toast(friendlyError(err), 'error'); }
+        });
+        const pf = document.getElementById('prodCarpenterFilter');
+        if (pf) pf.addEventListener('change', renderProduction);
+        const pis = document.getElementById('plankItemSelect');
+        if (pis) pis.addEventListener('change', () => { KEEL.selectedPlankItem = pis.value; renderMaterials(); });
+        const rs = document.getElementById('role-selector');
+        if (rs) rs.addEventListener('change', () => {
+            applyRolePermissions();
+            if (currentRoute === 'audit' && !hasPermission('view_audit')) navigateTo('dashboard');
+            toast('Role set to ' + resolveRole(currentRole()), 'info');
+        });
+        initRouter();
+        navigateTo('dashboard');
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+    </script>
+</body>
+</html>
