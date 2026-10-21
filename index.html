@@ -1305,7 +1305,8 @@
             const q = KEEL.quoteByKey(o.SalesQuote || o.salesQuote);
             if (q) {
                 const lc = lifecycleOf(q);
-                if (lc !== QUOTE_STATE.DESIGN_PENDING && lc !== QUOTE_STATE.CONVERTED) return false;
+                // Quotes that predate the CRM Lifecycle field have no state yet; keep their orders visible.
+                if (lc && lc !== QUOTE_STATE.DESIGN_PENDING && lc !== QUOTE_STATE.CONVERTED) return false;
             }
             return true;
         });
