@@ -424,10 +424,23 @@
         if (body !== undefined) message.body = body;
         beginBusy();
         try {
-            return await postMessageWithResponse(message);
+            return unwrapBridgeResponse(await postMessageWithResponse(message));
         } finally {
             endBusy();
         }
+    }
+    // Manager's extension bridge may hand back {status, body}; accept both shapes.
+    function unwrapBridgeResponse(res) {
+        if (res && typeof res === 'object' && !Array.isArray(res) &&
+            typeof res.status === 'number' && Object.prototype.hasOwnProperty.call(res, 'body')) {
+            const b = res.body;
+            if (res.status >= 400) {
+                const msg = (b && (b.message || b.error)) || ('Manager returned HTTP ' + res.status);
+                throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+            }
+            return b;
+        }
+        return res;
     }
     const apiGet = (path) => apiRequest('GET', path);
     const apiPost = (path, body) => apiRequest('POST', path, body);
@@ -443,9 +456,15 @@
     }
     function asRows(res) {
         if (Array.isArray(res)) return res;
-        if (res && Array.isArray(res.rows)) return res.rows;
-        if (res && Array.isArray(res.items)) return res.items;
-        if (res && Array.isArray(res.Items)) return res.Items;
+        if (!res || typeof res !== 'object') return [];
+        if (Array.isArray(res.rows)) return res.rows;
+        if (Array.isArray(res.items)) return res.items;
+        if (Array.isArray(res.Items)) return res.Items;
+        // Manager's list endpoints name the collection after the entity
+        // (customers, inventoryItems, salesQuotes...), so take the first array.
+        for (const k of Object.keys(res)) {
+            if (Array.isArray(res[k])) return res[k];
+        }
         return [];
     }
     // Paginated fetch; tolerates endpoints that ignore skip/pageSize and return everything.
@@ -463,8 +482,11 @@
         }
         return all;
     }
-    // Manager single-record reads take the key as a query parameter: GET /api4/customer?Key=<uuid>
-    const apiGetOne = (entityPath, key) => apiGet(entityPath + '?Key=' + encodeURIComponent(key));
+    // Manager API v2: GET /api2/<entity>-form/<key> returns one full record.
+    const apiGetOne = (entityPath, key) => apiGet(entityPath + '-form/' + encodeURIComponent(key));
+    // Writes take the record itself (no {value} wrapper); updates carry the key in the path.
+    const apiCreate = (entityPath, record) => apiPost(entityPath + '-form', record);
+    const apiUpdate = (entityPath, key, record) => apiPut(entityPath + '-form/' + encodeURIComponent(key), record);
 
     // List rows omit custom fields and line items, so fetch full records (bounded concurrency).
     async function hydrateAll(rows, entityPath, concurrency) {
@@ -670,6 +692,12 @@
         const p = (n) => String(n).padStart(2, '0');
         return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
     }
+    // Manager API v2 wants plain YYYY-MM-DD dates on document writes.
+    function todayIso() {
+        const d = new Date();
+        const p = (n) => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
     function bumpRevision(ref) {
         ref = (ref || 'SQ').trim();
         const m = ref.match(/^(.*?)(?:\s*Rev\s*(\d+))\s*$/i);
@@ -714,7 +742,7 @@
         // Discover custom fields so the app adapts to Keel's live configuration.
         async loadCustomFields() {
             try {
-                const rows = asRows(assertOk(await apiGet('/api4/text-custom-fields?pageSize=200')));
+                const rows = asRows(assertOk(await apiGet('/api2/text-custom-fields?pageSize=200')));
                 rows.forEach(f => {
                     const name = f.name || f.Name;
                     const key = f.key || f.Key;
@@ -730,13 +758,10 @@
         async ensureTextField(name, placement) {
             if (this.cfMap[name]) return this.cfMap[name];
             try {
-                const res = assertOk(await apiPost('/api4/text-custom-field', {
-                    value: {
-                        Name: name,
-                        Placement: placement || [SALES_QUOTE_TYPE],
-                        Type: 1,
-                        DisplayOnView: true
-                    }
+                const res = assertOk(await apiPost('/api2/text-custom-field-form', {
+                    Name: name,
+                    Placement: placement || [SALES_QUOTE_TYPE],
+                    DisplayOnView: true
                 }));
                 const key = newKeyOf(res);
                 if (!key) throw new Error('no key returned for "' + name + '"');
@@ -781,31 +806,31 @@
             this.fullItems = {};
 
             onProgress(20, 'Fetching Customers...');
-            const custRows = await apiListAll('/api4/customers', 100);
+            const custRows = await apiListAll('/api2/customers', 100);
             onProgress(30, 'Loading customer details (' + custRows.length + ')...');
-            this.data.customers = await hydrateAll(custRows, '/api4/customer', 8);
+            this.data.customers = await hydrateAll(custRows, '/api2/customer', 8);
             onProgress(45, 'Customers: ' + this.data.customers.length);
 
             onProgress(50, 'Fetching Inventory Items...');
-            this.data.inventoryItems = await apiListAll('/api4/inventory-items', 200);
+            this.data.inventoryItems = await apiListAll('/api2/inventory-items', 200);
             onProgress(65, 'Inventory Items: ' + this.data.inventoryItems.length);
 
             onProgress(75, 'Fetching Sales Quotes...');
-            const quoteRows = await apiListAll('/api4/sales-quotes', 100);
+            const quoteRows = await apiListAll('/api2/sales-quotes', 100);
             onProgress(80, 'Loading quote details (' + quoteRows.length + ')...');
-            this.data.salesQuotes = await hydrateAll(quoteRows, '/api4/sales-quote', 8);
+            this.data.salesQuotes = await hydrateAll(quoteRows, '/api2/sales-quote', 8);
             onProgress(88, 'Sales Quotes: ' + this.data.salesQuotes.length);
 
             onProgress(90, 'Fetching Sales Orders...');
-            const orderRows = await apiListAll('/api4/sales-orders', 100);
-            this.data.salesOrders = await hydrateAll(orderRows, '/api4/sales-order', 8);
+            const orderRows = await apiListAll('/api2/sales-orders', 100);
+            this.data.salesOrders = await hydrateAll(orderRows, '/api2/sales-order', 8);
 
             onProgress(95, 'Fetching Suppliers...');
-            this.data.suppliers = await apiListAll('/api4/suppliers', 100);
+            this.data.suppliers = await apiListAll('/api2/suppliers', 100);
 
             onProgress(97, 'Fetching Purchase Orders...');
-            const poRows = await apiListAll('/api4/purchase-orders', 100);
-            this.data.purchaseOrders = await hydrateAll(poRows, '/api4/purchase-order', 8);
+            const poRows = await apiListAll('/api2/purchase-orders', 100);
+            this.data.purchaseOrders = await hydrateAll(poRows, '/api2/purchase-order', 8);
             onProgress(100, 'Purchase Orders: ' + this.data.purchaseOrders.length);
 
             this.loaded = true;
@@ -1023,21 +1048,21 @@
     async function convertLead(key, btn) {
         if (!requirePermission('convert_lead')) return;
         await withProcessing(btn, async () => {
-            const customer = assertOk(await apiGetOne('/api4/customer', key));
+            const customer = assertOk(await apiGetOne('/api2/customer', key));
             cfSet(customer, 'Lead Status', CRMStatus.CONVERTED);
-            assertOk(await apiPut('/api4/customer', { key: key, value: customer }));
+            assertOk(await apiUpdate('/api2/customer', key, customer));
 
             const ref = 'SQ-' + stamp();
             const quote = {
                 Customer: key,
-                IssueDate: new Date().toISOString(),
+                IssueDate: todayIso(),
                 Reference: ref,
                 Lines: [],
                 CustomFields2: { Strings: {} }
             };
             cfSet(quote, 'CRM', 'Lead');
             await KEEL.setLifecycle(quote, QUOTE_STATE.DRAFT);
-            assertOk(await apiPost('/api4/sales-quote', { value: quote }));
+            assertOk(await apiCreate('/api2/sales-quote', quote));
 
             toast('Lead converted. Opportunity ' + ref + ' created.', 'success');
             await KEEL.initLoadData({});
@@ -1097,16 +1122,17 @@
     async function reviseQuote(key, btn) {
         if (!requirePermission('revise_quote')) return;
         await withProcessing(btn, async () => {
-            const old = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const old = assertOk(await apiGetOne('/api2/sales-quote', key));
             const clone = JSON.parse(JSON.stringify(old));
             delete clone.Key; delete clone.key; delete clone.id; delete clone.Id;
             delete clone.Timestamp; delete clone.timestamp;
+            delete clone.text; delete clone.UniqueName;
             clone.Reference = bumpRevision(old.Reference || old.reference);
             await KEEL.setLifecycle(clone, QUOTE_STATE.DRAFT);
-            assertOk(await apiPost('/api4/sales-quote', { value: clone }));
+            assertOk(await apiCreate('/api2/sales-quote', clone));
 
             await KEEL.setLifecycle(old, QUOTE_STATE.SUPERSEDED, cfGet(old, 'CRM State'));
-            assertOk(await apiPut('/api4/sales-quote', { key: key, value: old }));
+            assertOk(await apiUpdate('/api2/sales-quote', key, old));
 
             toast('Revision created: ' + clone.Reference + ' (previous superseded)', 'success');
             await KEEL.initLoadData({});
@@ -1116,10 +1142,10 @@
     async function approveQuote(key, btn) {
         if (!requirePermission('approve_quote')) return;
         await withProcessing(btn, async () => {
-            const q = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const q = assertOk(await apiGetOne('/api2/sales-quote', key));
             await KEEL.setLifecycle(q, QUOTE_STATE.APPROVED);
             cfSet(q, 'CRM', 'Proposal Approved');
-            assertOk(await apiPut('/api4/sales-quote', { key: key, value: q }));
+            assertOk(await apiUpdate('/api2/sales-quote', key, q));
             toast('Quote approved.', 'success');
             await KEEL.initLoadData({});
         });
@@ -1128,10 +1154,10 @@
     async function confirmPayment(key, btn) {
         if (!requirePermission('confirm_payment')) return;
         await withProcessing(btn, async () => {
-            const q = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const q = assertOk(await apiGetOne('/api2/sales-quote', key));
             await KEEL.setLifecycle(q, QUOTE_STATE.DESIGN_PENDING);
             cfSet(q, 'CRM', 'Payment Received');
-            assertOk(await apiPut('/api4/sales-quote', { key: key, value: q }));
+            assertOk(await apiUpdate('/api2/sales-quote', key, q));
             toast('Payment confirmed. Quote released to Design Team.', 'success');
             await KEEL.initLoadData({});
         });
@@ -1207,9 +1233,9 @@
                 updatedAt: new Date().toISOString()
             };
             await KEEL.ensureBomField();
-            const fresh = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const fresh = assertOk(await apiGetOne('/api2/sales-quote', key));
             cfSet(fresh, 'BOM JSON', stringifyCustomJson(payload));
-            assertOk(await apiPut('/api4/sales-quote', { key: key, value: fresh }));
+            assertOk(await apiUpdate('/api2/sales-quote', key, fresh));
             toast('BOM & drawings saved.', 'success');
             await KEEL.initLoadData({});
         });
@@ -1221,7 +1247,7 @@
         const bom = parseCustomJson(cfGet(q, 'BOM JSON'));
         if (!bom) { toast('Attach the BOM before approving.', 'error'); return; }
         await withProcessing(btn, async () => {
-            const quote = assertOk(await apiGetOne('/api4/sales-quote', key));
+            const quote = assertOk(await apiGetOne('/api2/sales-quote', key));
             const masterRef = 'M-' + Date.now();
 
             const ps = createEmptyProductionState();
@@ -1242,7 +1268,7 @@
 
             const order = {
                 Customer: quote.Customer || quote.customer,
-                Date: new Date().toISOString(),
+                Date: todayIso(),
                 Reference: masterRef,
                 SalesQuote: key,
                 BillingAddress: quote.BillingAddress || '',
@@ -1252,11 +1278,11 @@
             };
             cfSet(order, 'Master Reference', masterRef);
             cfSet(order, 'Production State', stringifyCustomJson(ps));
-            assertOk(await apiPost('/api4/sales-order', { value: order }));
+            assertOk(await apiCreate('/api2/sales-order', order));
 
             await KEEL.setLifecycle(quote, QUOTE_STATE.CONVERTED);
             cfSet(quote, 'CRM', 'Work Order Generated');
-            assertOk(await apiPut('/api4/sales-quote', { key: key, value: quote }));
+            assertOk(await apiUpdate('/api2/sales-quote', key, quote));
 
             toast('Sales Order ' + masterRef + ' created from quote.', 'success');
             await KEEL.initLoadData({});
@@ -1381,9 +1407,9 @@
     async function persistAndReload(orderKey, ps) {
         ps.updatedAt = new Date().toISOString();
         ps.version = (ps.version || 0) + 1;
-        const fresh = assertOk(await apiGetOne('/api4/sales-order', orderKey));
+        const fresh = assertOk(await apiGetOne('/api2/sales-order', orderKey));
         cfSet(fresh, 'Production State', stringifyCustomJson(ps));
-        assertOk(await apiPut('/api4/sales-order', { key: orderKey, value: fresh }));
+        assertOk(await apiUpdate('/api2/sales-order', orderKey, fresh));
         await KEEL.initLoadData({});
     }
 
@@ -1640,7 +1666,7 @@
     }
     async function loadFullItem(key) {
         if (KEEL.fullItems[key]) return KEEL.fullItems[key];
-        const full = assertOk(await apiGetOne('/api4/inventory-item', key));
+        const full = assertOk(await apiGetOne('/api2/inventory-item', key));
         if (full && !full.key && !full.Key) full.key = key;
         KEEL.fullItems[key] = full;
         return full;
@@ -1742,7 +1768,7 @@
             if (!(l > 0) || !(w > 0) || !(t > 0)) throw new Error('Length, width and thickness must be positive');
             if (!(qty >= 1)) throw new Error('Quantity must be at least 1');
             await KEEL.ensureSubledgerField();
-            const fresh = assertOk(await apiGetOne('/api4/inventory-item', itemKey));
+            const fresh = assertOk(await apiGetOne('/api2/inventory-item', itemKey));
             const reg = plankRegisterOf(fresh);
             const cft = plankCft(l, w, t);
             for (let i = 0; i < qty; i++) {
@@ -1753,7 +1779,7 @@
                 });
             }
             cfSet(fresh, SUBLEDGER_FIELD, stringifyCustomJson(reg));
-            assertOk(await apiPut('/api4/inventory-item', { key: itemKey, value: fresh }));
+            assertOk(await apiUpdate('/api2/inventory-item', itemKey, fresh));
             KEEL.fullItems[itemKey] = fresh;
             KEEL.selectedPlankItem = itemKey;
             toast(qty + ' plank(s) received (' + cft + ' CFT each).', 'success');
@@ -1793,7 +1819,7 @@
             const picks = checkedValues('.plank-pick:checked');
             if (!picks.length) throw new Error('Select at least one plank');
             await KEEL.ensureSubledgerField();
-            const fresh = assertOk(await apiGetOne('/api4/inventory-item', itemKey));
+            const fresh = assertOk(await apiGetOne('/api2/inventory-item', itemKey));
             const freshReg = plankRegisterOf(fresh);
             let n = 0;
             freshReg.planks.forEach(p => {
@@ -1806,7 +1832,7 @@
                 }
             });
             cfSet(fresh, SUBLEDGER_FIELD, stringifyCustomJson(freshReg));
-            assertOk(await apiPut('/api4/inventory-item', { key: itemKey, value: fresh }));
+            assertOk(await apiUpdate('/api2/inventory-item', itemKey, fresh));
             KEEL.fullItems[itemKey] = fresh;
             toast(n + ' plank(s) reserved for ' + orderRef, 'success');
             await KEEL.initLoadData({});
@@ -1836,25 +1862,25 @@
         const lines = po.Lines || po.lines || [];
         return lines.length ? lines.length + ' line(s)' : 'no lines';
     }
-    // Build a camelCase write payload (APIv4/OpenAPI) from a read record.
+    // Build a PascalCase write payload (API v2) from a read record.
     function poLineToWrite(l) {
         return {
-            item: l.Item !== undefined ? l.Item : (l.item !== undefined ? l.item : null),
-            lineDescription: l.LineDescription !== undefined ? l.LineDescription : (l.lineDescription || null),
-            qty: Number(l.Qty !== undefined ? l.Qty : l.qty) || 0,
-            purchaseUnitPrice: Number(l.PurchaseUnitPrice !== undefined ? l.PurchaseUnitPrice : l.purchaseUnitPrice) || 0
+            Item: l.Item !== undefined ? l.Item : (l.item !== undefined ? l.item : null),
+            LineDescription: l.LineDescription !== undefined ? l.LineDescription : (l.lineDescription || null),
+            Qty: Number(l.Qty !== undefined ? l.Qty : l.qty) || 0,
+            PurchaseUnitPrice: Number(l.PurchaseUnitPrice !== undefined ? l.PurchaseUnitPrice : l.purchaseUnitPrice) || 0
         };
     }
     function poToWritePayload(po) {
         const lines = (po.Lines || po.lines || []).map(poLineToWrite);
         const cf = (po.CustomFields2 && po.CustomFields2.Strings) || (po.customFields2 && po.customFields2.strings) || {};
         return {
-            date: po.Date || po.date || new Date().toISOString(),
-            reference: po.Reference || po.reference || null,
-            supplier: po.Supplier || po.supplier || null,
-            description: po.Description || po.description || null,
-            lines: lines,
-            customFields2: { strings: cf }
+            Date: po.Date || po.date || todayIso(),
+            Reference: po.Reference || po.reference || null,
+            Supplier: po.Supplier || po.supplier || null,
+            Description: po.Description || po.description || null,
+            Lines: lines,
+            CustomFields2: { Strings: cf }
         };
     }
     function nextPRRef() {
@@ -1940,19 +1966,19 @@
             if (!(qty > 0)) throw new Error('Quantity must be positive');
             const ref = nextPRRef();
             const po = {
-                date: new Date().toISOString(),
-                reference: ref,
-                supplier: supplierKey,
-                description: desc,
-                lines: [{
-                    item: itemKey || null,
-                    lineDescription: desc,
-                    qty: qty,
-                    purchaseUnitPrice: isFinite(price) ? price : 0
+                Date: todayIso(),
+                Reference: ref,
+                Supplier: supplierKey,
+                Description: desc,
+                Lines: [{
+                    Item: itemKey || null,
+                    LineDescription: desc,
+                    Qty: qty,
+                    PurchaseUnitPrice: isFinite(price) ? price : 0
                 }],
-                customFields2: { strings: {} }
+                CustomFields2: { Strings: {} }
             };
-            assertOk(await apiPost('/api4/purchase-order', { value: po }));
+            assertOk(await apiCreate('/api2/purchase-order', po));
             toast('Purchase Requisition ' + ref + ' created (Draft).', 'success');
             await KEEL.initLoadData({});
         });
@@ -1967,11 +1993,11 @@
             '<p class="text-xs text-dark-muted mt-2">Supplier: ' + escapeHtml(KEEL.supplierName(po.Supplier || po.supplier)) +
             ' - ' + escapeHtml(poLineSummary(po)) + ' - Amount ' + num2(poTotal(po)) + '</p>';
         openModal('Approve PR -> Issue PO', html, async () => {
-            const fresh = assertOk(await apiGetOne('/api4/purchase-order', key));
+            const fresh = assertOk(await apiGetOne('/api2/purchase-order', key));
             const payload = poToWritePayload(fresh);
-            payload.reference = nextPORef();
-            assertOk(await apiPut('/api4/purchase-order', { key: key, value: payload }));
-            toast('Purchase Order ' + payload.reference + ' issued.', 'success');
+            payload.Reference = nextPORef();
+            assertOk(await apiUpdate('/api2/purchase-order', key, payload));
+            toast('Purchase Order ' + payload.Reference + ' issued.', 'success');
             await KEEL.initLoadData({});
         });
     }
