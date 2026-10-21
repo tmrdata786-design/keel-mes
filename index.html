@@ -89,6 +89,8 @@
                         <option value="procurement">Procurement Officer</option>
                         <option value="finance">Finance / Accounts</option>
                     </select>
+                    <button id="readmeBtn" class="btn-secondary text-xs py-1.5 px-3 rounded-md">Read Me</button>
+                    <button id="devBtn" class="btn-secondary text-xs py-1.5 px-3 rounded-md">Developer Details</button>
                     <button id="refreshBtn" class="btn-secondary text-xs py-1.5 px-3 rounded-md">Refresh</button>
                 </div>
             </div>
@@ -217,7 +219,7 @@
     <!-- Modal host -->
     <div id="modalHost" class="fixed inset-0 z-40 hidden">
         <div class="absolute inset-0 bg-black/60" data-modal-close></div>
-        <div class="relative max-w-lg mx-auto mt-24 bg-dark-surface border border-dark rounded-lg p-6 shadow-xl">
+        <div class="relative max-w-lg mx-auto mt-24 bg-dark-surface border border-dark rounded-lg p-6 shadow-xl max-h-[85vh] overflow-y-auto">
             <h3 id="modalTitle" class="text-lg font-semibold mb-4"></h3>
             <div id="modalBody" class="space-y-3"></div>
             <div class="flex justify-end gap-2 mt-6">
@@ -1202,12 +1204,141 @@
         const confirmBtn = document.getElementById('modalConfirm');
         const newBtn = confirmBtn.cloneNode(true);
         confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+        newBtn.classList.remove('hidden');
         newBtn.addEventListener('click', async () => {
             await withProcessing(newBtn, async () => { await onConfirm(); closeModal(); });
         });
         host.classList.remove('hidden');
     }
     function closeModal() { document.getElementById('modalHost').classList.add('hidden'); }
+
+    // =========================================================================
+    // Help: user manual (Read Me) and developer details
+    // =========================================================================
+    function openInfoModal(title, bodyHtml) {
+        const host = document.getElementById('modalHost');
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalBody').innerHTML = bodyHtml;
+        const confirmBtn = document.getElementById('modalConfirm');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+        host.classList.remove('hidden');
+    }
+    function readmeHtml() {
+        const h = (t) => '<h4 class="text-sm font-semibold text-slate-100 mt-4">' + t + '</h4>';
+        const p = (t) => '<p class="text-xs leading-relaxed text-slate-300">' + t + '</p>';
+        const ul = (items) => '<ul class="text-xs leading-relaxed text-slate-300 list-disc pl-5 space-y-1">' +
+            items.map(i => '<li>' + i + '</li>').join('') + '</ul>';
+        return [
+            p('<strong>Keel Furniture MES &amp; CRM</strong> is your sales and manufacturing workspace. It runs inside Manager.io and reads and writes every record there, so the commercial team and accounts always work from the same data.'),
+            h('1. Opening the app'),
+            ul([
+                'Open it from the Custom Button inside Manager.io (usually <em>KEEL-MES</em>).',
+                'It uses your Manager.io login - there is no separate password.',
+                'Click <strong>Load Data</strong> the first time. The <strong>Refresh</strong> button in the header re-reads Manager.io at any time.'
+            ]),
+            h('2. Roles'),
+            p('Pick your role in the header <strong>Role</strong> selector. Actions you are not allowed to perform are hidden or disabled automatically.'),
+            ul([
+                '<strong>Admin (CEO)</strong> - everything, including CEO design approval and the Audit Trail.',
+                '<strong>Sales Manager</strong> - leads, quotes, commercial approvals, pipeline.',
+                '<strong>Sales Rep</strong> - creates and revises quotes; cannot approve quotes or purchase requisitions.',
+                '<strong>Cost Engineer</strong> - attaches BOM and drawings, revises quotes.',
+                '<strong>Production Manager</strong> - stage routing, QC, gate passes; cannot approve commercial pricing.',
+                '<strong>Procurement Officer</strong> - purchase requisitions, gate passes, inward returns.',
+                '<strong>Finance / Accounts</strong> - confirms customer payment and approves commercial pricing.'
+            ]),
+            h('3. Dashboard'),
+            p('Live counters for active orders, delayed orders, open quotes, QC quarantine and customers. Load turns amber near capacity and red when a stage is overloaded.'),
+            h('4. CRM - leads and customers'),
+            ul([
+                'Leads are Manager.io customers with Lead Status <em>New</em> or <em>Qualified</em>.',
+                '<strong>Convert</strong> marks the customer as Converted and opens a Sales Quote in Draft with the next SQ reference.',
+                'Lead status and notes are stored on the Manager.io customer record.'
+            ]),
+            h('5. Pipeline - quotes'),
+            ul([
+                'Columns: Draft, Shared with Client, Negotiation, Approved.',
+                '<strong>Revise</strong> clones the quote as the next revision and supersedes the previous one.',
+                '<strong>Approve</strong> records commercial approval. <strong>Confirm Payment</strong> moves the quote to Design Pending and releases it to the design team.'
+            ]),
+            h('6. Design Team - BOM and CEO approval'),
+            ul([
+                '<strong>Attach BOM</strong> stores drawing links, the BOM sheet URL, expected hours and the estimator on the quote.',
+                '<strong>CEO Approve</strong> creates the Sales Order with a Master Reference (M-...) and seeds the 18-stage production state. Each quote line becomes a routed item.'
+            ]),
+            h('7. Production Floor - 18 stages, 5 departments'),
+            p('Carpentry (1-4), Veneering (5-6), Job-Work (7-10, outsourced), Polish (11-14), Upholstery (15-18).'),
+            ul([
+                'Each item shows its stage, assigned carpenter, deadline and estimated hours.',
+                'A stage cannot be advanced until its QC gate is signed off (hard gate).',
+                'Failed QC quarantines the item: it leaves the floor board and appears in QC Quarantine.',
+                'Outsourced stages require an Outbound gate pass before the item can move on.'
+            ]),
+            h('8. QC Quarantine'),
+            p('Failed items stay here with the defect reason, stage, department and vendor. <strong>Release</strong> returns an item to the floor and records the rework.'),
+            h('9. Materials - plank register'),
+            ul([
+                '<strong>Receive Planks</strong> adds dimensional stock (length, width, thickness) and computes CFT as L x W x T / 1728.',
+                'Each plank gets an LHR-26-xxxx id and is either Available or Reserved.',
+                '<strong>Issue / Reserve Planks</strong> ties planks to a work order reference.',
+                'The register is stored as JSON on the inventory item, so Manager.io stays the single source of truth.'
+            ]),
+            h('10. Procurement - PR to PO'),
+            ul([
+                'Generate a Purchase Requisition (PR-YYYY-NNN) from the procurement view.',
+                '<strong>Approve PR</strong> re-issues the document as a Purchase Order (PO-YYYY-NNN).',
+                'PR and PO are recognised by the reference prefix, not by a status field.'
+            ]),
+            h('11. Subcontractors - gate passes'),
+            ul([
+                '<strong>Issue Gate Pass</strong> sends an item to a vendor for a Job-Work stage, with out date and expected return.',
+                '<strong>Log Inward</strong> records the return and the incoming QC (IQC). A failed IQC quarantines the item.',
+                'The vendor panel shows workload by stage and flags dependency risk when only one vendor serves a stage.'
+            ]),
+            h('12. Capacity'),
+            p('Carpenter load against a 40 hour week. Near full is 85% or more; overload is 100% or more.'),
+            h('13. Audit Trail'),
+            p('Admin and Sales Manager only. Merges production stage history, QC logs, gate passes and defect or rework events into one chronological log with project reference and user.'),
+            h('14. Good to know'),
+            ul([
+                'All data lives in Manager.io custom fields - nothing is stored in this page.',
+                'Records created through the API are approved documents; Manager.io does not allow API drafts.',
+                'If a screen looks stale, press <strong>Refresh</strong>. If a request fails, a red toast names the reason.'
+            ])
+        ].join('');
+    }
+    function developerHtml() {
+        const link = (href, label) => '<a class="text-blue-400 hover:underline break-all" href="' + href +
+            '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+        const p = (t) => '<p class="text-xs leading-relaxed text-slate-300">' + t + '</p>';
+        const row = (label, value) => '<div class="flex gap-3 py-1"><span class="text-xs text-dark-muted w-24 shrink-0">' +
+            label + '</span><span class="text-xs text-slate-300">' + value + '</span></div>';
+        return [
+            '<p class="text-sm font-semibold text-slate-100">Promo ERP</p>',
+            p('Promo ERP is a dedicated Enterprise Resource Planning (ERP) service provider specializing in scalable, feature-rich solutions designed for businesses of all sizes.'),
+            p('Our mission is to synchronize your company operations by integrating essential functions like finance, inventory, and sales into a single, unified platform. By offering tiered packages, we ensure that every client receives the precise level of automation and functionality required for its current scale and growth trajectory.'),
+            p('We also offer customization, integrations, Custom Apps and AI Automation.'),
+            '<h4 class="text-sm font-semibold text-slate-100 mt-4">Contact</h4>',
+            '<div class="border border-dark rounded-md p-3">',
+            row('Email', link('mailto:info@promoerp.it', 'info@promoerp.it')),
+            row('Email', link('mailto:promoerp786@gmail.com', 'promoerp786@gmail.com')),
+            row('Phone', link('tel:+923218833616', '+92-321-8833616')),
+            row('WhatsApp', link('https://wa.me/923218833616', 'wa.me/923218833616')),
+            '</div>',
+            '<h4 class="text-sm font-semibold text-slate-100 mt-4">Links</h4>',
+            '<div class="border border-dark rounded-md p-3">',
+            row('Website', link('http://promoerp.it/', 'promoerp.it')),
+            row('Website', link('https://promoautomations.vercel.app', 'promoautomations.vercel.app')),
+            row('Website', link('https://sites.google.com/view/promoerp/home', 'sites.google.com/view/promoerp/home')),
+            row('Facebook', link('https://facebook.com/promoerp786', 'facebook.com/promoerp786')),
+            row('YouTube', link('https://www.youtube.com/@PromoERP', 'youtube.com/@PromoERP')),
+            row('Source', link('https://github.com/tmrdata786-design/keel-mes', 'github.com/tmrdata786-design/keel-mes')),
+            '</div>',
+            '<h4 class="text-sm font-semibold text-slate-100 mt-4">About this build</h4>',
+            p('Keel Furniture MES &amp; CRM - a single-file application (index.html) with no build step, hosted on GitHub Pages and embedded in Manager.io as a Custom Button. All reads and writes go through the Manager.io API (api2): list endpoints for summaries, -form endpoints for full records, and custom fields for state (Production State, Master Reference, CRM Lifecycle, BOM JSON, Item Subledger JSON).'),
+            p('Role-based permissions are enforced in the UI and re-checked before every write. Errors are surfaced as toasts with the server message.')
+        ].join('');
+    }
 
     async function attachBom(key, btn) {
         if (!requirePermission('attach_bom')) return;
@@ -2341,6 +2472,10 @@
             try { await KEEL.initLoadData({}); toast('Data refreshed from Manager.io', 'info'); }
             catch (err) { console.error(err); toast(friendlyError(err), 'error'); }
         });
+        const rb = document.getElementById('readmeBtn');
+        if (rb) rb.addEventListener('click', () => openInfoModal('Read Me - User Manual', readmeHtml()));
+        const devBtnEl = document.getElementById('devBtn');
+        if (devBtnEl) devBtnEl.addEventListener('click', () => openInfoModal('Developer Details', developerHtml()));
         const pf = document.getElementById('prodCarpenterFilter');
         if (pf) pf.addEventListener('change', renderProduction);
         const pis = document.getElementById('plankItemSelect');
